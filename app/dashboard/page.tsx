@@ -6,6 +6,7 @@ import { doc, getDoc, collection, getDocs, query, orderBy } from "firebase/fires
 import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { UserData } from "@/types/user"; // Ajuste le chemin selon ton dossier
+import { ConfigData } from "@/types/config"; // Ajuste le chemin selon ton dossier
 import Image from 'next/image';
 
 export default function DashboardPage() {
@@ -13,21 +14,8 @@ export default function DashboardPage() {
   const router = useRouter();
   const [allPlayers, setAllPlayers] = useState<UserData[]>([]);
   const [myRank, setMyRank] = useState<number>(0);
+  const [nextEpisodeData, setNextEpisodeData] = useState<ConfigData | null>(null);
 
-//   useEffect(() => {
-//     const fetchUser = async () => {
-//       const user = auth.currentUser;
-//       if (user) {
-//         const docSnap = await getDoc(doc(db, "users", user.uid));
-//         if (docSnap.exists()) {
-//             const data = docSnap.data() as UserData;
-//             setUserData(data);
-//             }
-//         // if (docSnap.exists()) setUserData(docSnap.data());
-//       }
-//     };
-//     fetchUser();
-//   }, []);
     useEffect(() => {
         const fetchData = async () => {
         // 1. Récupérer mon profil
@@ -55,7 +43,13 @@ export default function DashboardPage() {
         // 3. Calculer mon classement
         const rank = players.findIndex(p => p.surnom === myData?.surnom) + 1;
         setMyRank(rank);
+
+        const configSnap = await getDoc(doc(db, "config", "next_episode"));
+        if (configSnap.exists()) {
+        setNextEpisodeData(configSnap.data() as ConfigData);
+        }
         };
+
         fetchData();
     }, []);
 
@@ -129,12 +123,15 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-2 gap-6 items-center">
                     {/* Colonne Gauche : Infos */}
                     <div className="space-y-2">
-                    <p className="text-gray-900 font-bold text-lg">Saison 4</p>
-                    <p className="text-purple-700 font-bold text-2xl">Épisode 1</p>
-                    <div className="pt-4">
-                        <p className="text-sm text-gray-500">Diffusion prévue le :</p>
-                        <p className="font-semibold text-gray-800">20 Juin 2026</p>
-                    </div>
+                        <p className="text-gray-900 font-bold text-lg">Saison 4</p>
+                        <p className="text-purple-700 font-bold text-2xl">Épisode {nextEpisodeData?.numero}</p>
+                        <div className="pt-4">
+                            <p className="text-sm text-gray-500">Diffusion prévue le :</p>
+                            <p className="font-semibold text-gray-800">{nextEpisodeData?.date}</p>
+                        </div>
+                        <p className="text-sm text-purple-700 font-bold mt-2">
+                            Pronostics ouverts sur cet épisode jusqu&apos;au : {nextEpisodeData?.dateLimite}
+                        </p>
                     </div>
 
                     {/* Colonne Droite : Miniature */}

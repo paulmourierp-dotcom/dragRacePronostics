@@ -10,6 +10,7 @@ export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [episodeNum, setEpisodeNum] = useState(1);
   const [dateDiffusion, setDateDiffusion] = useState("");
+  const [dateLimite, setDateLimite] = useState("");
 //   const [users, setUsers] = useState<any[]>([]);
 //   const [users, setUsers] = useState<[]>([]);
   const [users, setUsers] = useState<UserData[]>([]);
@@ -31,6 +32,7 @@ export default function AdminPage() {
         if (configDoc.exists()) {
           setEpisodeNum(configDoc.data().numero);
           setDateDiffusion(configDoc.data().date);
+          setDateLimite(configDoc.data().dateLimite);
         }
         
         // Charger la liste des joueurs
@@ -65,7 +67,8 @@ export default function AdminPage() {
     try {
       await updateDoc(doc(db, "config", "next_episode"), {
         numero: episodeNum,
-        date: dateDiffusion
+        date: dateDiffusion,
+        dateLimite: dateLimite
       });
       alert("Épisode mis à jour !");
     } catch (err) {
@@ -105,6 +108,16 @@ export default function AdminPage() {
                   onChange={(e) => setDateDiffusion(e.target.value)}
                   placeholder="Ex: 20 Juin 2026"
                   className="w-full p-3 rounded-xl border border-gray-200 text-gray-900"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Date limite pronostics</label>
+                <input 
+                    type="text" 
+                    value={dateLimite}
+                    onChange={(e) => setDateLimite(e.target.value)}
+                    placeholder="Ex: 19 Juin 2026"
+                    className="w-full p-3 rounded-xl border border-gray-200 text-gray-900"
                 />
               </div>
               <button type="submit" className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl hover:bg-purple-700 transition">
