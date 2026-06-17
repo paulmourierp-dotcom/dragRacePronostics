@@ -64,8 +64,13 @@
 //   );
 // }
 
-import { redirect } from 'next/navigation';
+// import { redirect } from 'next/navigation';
 
+// export default function Page() {
+//   redirect('/dashboard');
+// }
+// app/page.tsx
 export default function Page() {
-  redirect('/dashboard');
+  // On retire la redirection ici pour laisser le layout.tsx gérer la sécurité
+  return <main>Redirection en cours...</main>;
 }
