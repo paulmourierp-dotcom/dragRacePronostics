@@ -48,7 +48,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user && pathname !== "/login") {
-        router.push("/login");
+        router.push("/login"); // Redirection forcée vers login si non connecté
+      } else if (user && pathname === "/login") {
+        router.push("/dashboard"); // Si déjà connecté, on envoie vers le dashboard
       }
       setLoading(false);
     });
