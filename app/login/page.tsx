@@ -231,7 +231,7 @@ export default function LoginPage() {
             }}
             className="text-purple-700 hover:text-purple-900 font-semibold mt-1 transition"
           >
-            {isRegistering ? "Connectez-vous" : "Créez un compte gratuitement"}
+            {isRegistering ? "Connectez-vous" : "Créez un compte "}
           </button>
         </div>
 

@@ -6,6 +6,7 @@ import { doc, getDoc, collection, getDocs, query, orderBy } from "firebase/fires
 import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { UserData } from "@/types/user"; // Ajuste le chemin selon ton dossier
+import Image from 'next/image';
 
 export default function DashboardPage() {
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -81,14 +82,14 @@ export default function DashboardPage() {
       <div className="grid md:grid-cols-2 gap-6 p-6">
       {/* Colonne Gauche : Stats & Classement */}
         <section className="space-y-6">
-            <div className="bg-white p-6 rounded shadow border border-gray-200">
+            <div className="bg-white p-6 rounded shadow border border-gray-200 rounded-xl">
             <h2 className="text-xl font-bold mb-4 text-gray-900">Tes Statistiques</h2>
             <p className="text-gray-800">Score total : {userData?.score || 0} points</p>
             <p className="text-gray-800 font-semibold">Classement : {userData?.score === 0 ? "Non classé" : `${myRank}e position`}</p>
             </div>
 
             {/* Podium */}
-            <div className="bg-white p-6 rounded shadow border border-gray-200">
+            <div className="bg-white p-6 rounded shadow border border-gray-200 rounded-xl">
             <h2 className="text-xl font-bold mb-4 text-gray-900">Podium</h2>
             <div className="flex justify-around items-end mb-8">
                 {allPlayers.slice(0, 3).map((player, index) => (
@@ -122,18 +123,32 @@ export default function DashboardPage() {
         </section>
 
         <section className="space-y-6">
-          <div className="bg-purple-100 p-6 rounded shadow">
-            <h2 className="font-bold text-gray-900">Saison 4 - Prochain Épisode</h2>
-            <p>Diffusion : 20 Juin 2026</p>
-          </div>
-          <div className="bg-white p-6 rounded shadow text-center">
-            <button 
-              onClick={() => router.push("/pronostics")} 
-              className="bg-purple-600 text-white w-full py-4 rounded font-bold text-gray-900"
-            >
-              Faire mes pronostics
-            </button>
-          </div>
+          <h2 className="text-xl font-bold mb-4 text-gray-950">Prochain Épisode</h2>
+  
+            <div className="relative w-full h-48 mb-4 overflow-hidden rounded-xl">
+                {/* Utilisation du composant Image de Next.js */}
+                <Image 
+                src="/miniature.jpg" 
+                alt="Miniature du prochain épisode"
+                fill
+                className="object-cover"
+                priority // Utile pour charger l'image rapidement
+                />
+            </div>
+
+            <div className="text-gray-800">
+                <p className="font-bold text-lg">Saison 4 - Épisode à venir</p>
+                <p className="text-gray-600">Diffusion : 20 Juin 2026</p>
+            </div>
+            
+            <div className="bg-white p-6 rounded shadow text-center rounded-xl">
+                <button 
+                onClick={() => router.push("/pronostics")} 
+                className="bg-purple-600 text-white w-full py-4 rounded font-bold text-gray-900"
+                >
+                Faire mes pronostics
+                </button>
+            </div>
         </section>
       </div>
     </main>
