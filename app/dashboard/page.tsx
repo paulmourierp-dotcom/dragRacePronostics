@@ -130,7 +130,7 @@ export default function DashboardPage() {
                             <p className="font-semibold text-gray-800">{nextEpisodeData?.date}</p>
                         </div>
                         <p className="text-sm text-purple-700 font-bold mt-2">
-                            Pronostics ouverts sur cet épisode jusqu&apos;au : {nextEpisodeData?.dateLimite}
+                            Pronostics de l&apos;épisode {nextEpisodeData?.numero} jusqu&apos;au : {nextEpisodeData?.dateLimite}
                         </p>
                     </div>
 
