@@ -113,7 +113,7 @@ export default function DashboardPage() {
                     {player.surnom}
                     </span>
                     <span className="font-bold">
-                    {(player.score ?? 0) > 0 ? `${player.score} pts` : "-"}
+                    {(player.score ?? 0) > 0 ? `${player.score} pts` : "0 pts"}
                     </span>
                 </li>
                 ))}
