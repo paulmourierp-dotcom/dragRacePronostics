@@ -1,4 +1,4 @@
-@import "tailwindcss";
+/* @import "tailwindcss";
 
 :root {
   --background: #ffffff;
@@ -16,6 +16,46 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer base {
+  button, 
+  [role="button"], 
+  a {
+    cursor: pointer;
+  }
+} */
+
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  /* Gris très foncé au lieu de #171717 (noir) */
+  --foreground: #374151; 
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* Optionnel : Supprime ce bloc si tu ne veux pas de mode sombre, 
+  ou ajuste la valeur '--foreground' ici aussi si tu veux conserver le mode sombre 
+  mais avec un texte foncé.
+*/
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #d1d5db; /* Gris clair pour rester lisible sur fond noir */
   }
 }
 

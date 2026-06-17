@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+// import { doc, getDoc, orderBy } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { UserData } from "@/types/user"; // Ajuste le chemin selon ton dossier
@@ -9,21 +10,53 @@ import { UserData } from "@/types/user"; // Ajuste le chemin selon ton dossier
 export default function DashboardPage() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const router = useRouter();
+  const [allPlayers, setAllPlayers] = useState<UserData[]>([]);
+  const [myRank, setMyRank] = useState<number>(0);
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      const user = auth.currentUser;
-      if (user) {
-        const docSnap = await getDoc(doc(db, "users", user.uid));
-        if (docSnap.exists()) {
-            const data = docSnap.data() as UserData;
-            setUserData(data);
-            }
-        // if (docSnap.exists()) setUserData(docSnap.data());
-      }
-    };
-    fetchUser();
-  }, []);
+//   useEffect(() => {
+//     const fetchUser = async () => {
+//       const user = auth.currentUser;
+//       if (user) {
+//         const docSnap = await getDoc(doc(db, "users", user.uid));
+//         if (docSnap.exists()) {
+//             const data = docSnap.data() as UserData;
+//             setUserData(data);
+//             }
+//         // if (docSnap.exists()) setUserData(docSnap.data());
+//       }
+//     };
+//     fetchUser();
+//   }, []);
+    useEffect(() => {
+        const fetchData = async () => {
+        // 1. Récupérer mon profil
+        const user = auth.currentUser;
+        if (!user) return;
+        
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        const myData = userDoc.data();
+        if (myData) {
+        // On caste 'myData' en 'UserData' uniquement si il existe
+        setUserData(myData as UserData);
+        } else {
+        // Si le document est vide en base, on met 'null'
+        setUserData(null);
+        }
+
+        // 2. Récupérer tous les joueurs triés par score
+        const q = query(collection(db, "users"), orderBy("score", "desc"));
+        const querySnapshot = await getDocs(q);
+        const players: UserData[] = [];
+        querySnapshot.forEach((doc) => players.push(doc.data() as UserData));
+        
+        setAllPlayers(players);
+
+        // 3. Calculer mon classement
+        const rank = players.findIndex(p => p.surnom === myData?.surnom) + 1;
+        setMyRank(rank);
+        };
+        fetchData();
+    }, []);
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -46,9 +79,36 @@ export default function DashboardPage() {
 
       {/* Colonnes */}
       <div className="grid md:grid-cols-2 gap-6 p-6">
-        <section className="bg-white p-6 rounded shadow">
-          <h2 className="text-xl font-bold mb-4 text-gray-900">Tes Statistiques</h2>
-          <p>Score total : {userData?.score || 0} points</p>
+      {/* Colonne Gauche : Stats & Classement */}
+        <section className="space-y-6">
+            <div className="bg-white p-6 rounded shadow border border-gray-200">
+            <h2 className="text-xl font-bold mb-4 text-gray-900">Tes Statistiques</h2>
+            <p className="text-gray-800">Score total : {userData?.score || 0} points</p>
+            <p className="text-gray-800 font-semibold">Classement : {myRank > 0 ? `${myRank}e position` : "Non classé"}</p>
+            </div>
+
+            {/* Podium */}
+            <div className="bg-white p-6 rounded shadow border border-gray-200">
+            <h2 className="text-xl font-bold mb-4 text-gray-900">Podium</h2>
+            <div className="flex justify-around items-end mb-6">
+                {allPlayers.slice(0, 3).map((player, index) => (
+                <div key={index} className="text-center">
+                    <div className="font-bold text-lg">{player.surnom}</div>
+                    <div className="bg-purple-600 text-white px-4 py-2 rounded">{player.score} pts</div>
+                </div>
+                ))}
+            </div>
+
+            {/* Liste des autres */}
+            <ul className="divide-y divide-gray-100">
+                {allPlayers.slice(3).map((player, index) => (
+                <li key={index} className="py-2 flex justify-between">
+                    <span>{player.surnom}</span>
+                    <span className="font-bold">{player.score} pts</span>
+                </li>
+                ))}
+            </ul>
+            </div>
         </section>
 
         <section className="space-y-6">
