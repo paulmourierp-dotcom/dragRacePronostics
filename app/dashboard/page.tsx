@@ -33,31 +33,33 @@ export default function DashboardPage() {
         <div className="flex gap-2">
           <button onClick={() => router.push("/regles")} className="p-2 text-sm text-gray-600">Règles</button>
           {userData?.role === "admin" && (
-            <button onClick={() => router.push("/admin")} className="bg-red-500 text-white px-3 py-1 rounded">Admin</button>
+            <button onClick={() => router.push("/admin")} className="bg-red-500 text-white px-3 py-1 rounded text-gray-900">Admin</button>
           )}
-          <button onClick={() => signOut(auth)} className="bg-gray-200 px-3 py-1 rounded">Déconnexion</button>
+          <button onClick={() => signOut(auth)} className="bg-gray-200 px-3 py-1 rounded text-gray-900">
+            Déconnexion
+          </button>
         </div>
       </header>
 
       {/* Bienvenue */}
-      <h1 className="text-3xl font-bold p-6">Bienvenue {userData?.surnom || "Queen"} !</h1>
+      <h1 className="text-3xl font-bold p-6 text-gray-900">Bienvenue {userData?.surnom || "Queen"} !</h1>
 
       {/* Colonnes */}
       <div className="grid md:grid-cols-2 gap-6 p-6">
         <section className="bg-white p-6 rounded shadow">
-          <h2 className="text-xl font-bold mb-4">Tes Statistiques</h2>
+          <h2 className="text-xl font-bold mb-4 text-gray-900">Tes Statistiques</h2>
           <p>Score total : {userData?.score || 0} points</p>
         </section>
 
         <section className="space-y-6">
           <div className="bg-purple-100 p-6 rounded shadow">
-            <h2 className="font-bold">Saison 4 - Prochain Épisode</h2>
+            <h2 className="font-bold text-gray-900">Saison 4 - Prochain Épisode</h2>
             <p>Diffusion : 20 Juin 2026</p>
           </div>
           <div className="bg-white p-6 rounded shadow text-center">
             <button 
               onClick={() => router.push("/pronostics")} 
-              className="bg-purple-600 text-white w-full py-4 rounded font-bold"
+              className="bg-purple-600 text-white w-full py-4 rounded font-bold text-gray-900"
             >
               Faire mes pronostics
             </button>
