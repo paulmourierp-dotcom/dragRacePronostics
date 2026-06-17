@@ -123,23 +123,32 @@ export default function DashboardPage() {
         </section>
 
         <section className="space-y-6">
-          <h2 className="text-xl font-bold mb-4 text-gray-950">Prochain Épisode</h2>
-  
-            <div className="relative w-full h-48 mb-4 overflow-hidden rounded-xl">
-                {/* Utilisation du composant Image de Next.js */}
-                <Image 
-                src="/miniature.jpg" 
-                alt="Miniature du prochain épisode"
-                fill
-                className="object-cover"
-                priority // Utile pour charger l'image rapidement
-                />
-            </div>
+            <section className="bg-white p-6 rounded-[15px] shadow-sm border border-gray-100">
+                <h2 className="text-xl font-bold mb-6 text-gray-950">Prochain Épisode</h2>
+                
+                <div className="grid grid-cols-2 gap-6 items-center">
+                    {/* Colonne Gauche : Infos */}
+                    <div className="space-y-2">
+                    <p className="text-gray-900 font-bold text-lg">Saison 4</p>
+                    <p className="text-purple-700 font-bold text-2xl">Épisode 1</p>
+                    <div className="pt-4">
+                        <p className="text-sm text-gray-500">Diffusion prévue le :</p>
+                        <p className="font-semibold text-gray-800">20 Juin 2026</p>
+                    </div>
+                    </div>
 
-            <div className="text-gray-800">
-                <p className="font-bold text-lg">Saison 4 - Épisode à venir</p>
-                <p className="text-gray-600">Diffusion : 20 Juin 2026</p>
-            </div>
+                    {/* Colonne Droite : Miniature */}
+                    <div className="relative w-full aspect-video overflow-hidden rounded-[15px]">
+                    <Image 
+                        src="/miniature.jpg" 
+                        alt="Miniature prochain épisode"
+                        fill
+                        className="object-cover"
+                        priority
+                    />
+                    </div>
+                </div>
+            </section>
             
             <div className="bg-white p-6 rounded shadow text-center rounded-xl">
                 <button 
