@@ -22,11 +22,13 @@ export default function LoginPage() {
 
         // 2. Enregistrement du surnom dans Firestore
         await setDoc(doc(db, "users", user.uid), {
-          surnom: surnom,
-          email: email,
-          createdAt: new Date(),
-        });
-        alert("Compte créé et surnom enregistré !");
+            surnom: surnom,
+            email: email,
+            role: "user",
+            score: 0,
+            createdAt: new Date(),
+            });
+        alert("Compte créé avec succès !");
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }
