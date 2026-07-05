@@ -24,6 +24,28 @@ export default function AdminPage() {
     alert("Liste mise à jour !");
   };
 
+  const handleSaveQueens = async () => {
+    // On récupère la valeur actuelle dans le textarea
+    const textarea = document.getElementById('queensArea') as HTMLTextAreaElement;
+    const newValue = textarea.value.split('\n').filter(name => name.trim() !== "");
+
+    try {
+      // Mise à jour dans Firebase
+      await updateDoc(doc(db, "game_data", "lists"), {
+        queens: newValue
+      });
+      
+      // Feedback visuel
+      alert("La liste des Queens a été mise à jour avec succès !");
+      
+      // Optionnel : mettre à jour le state local pour refléter le changement
+      setQueensList(newValue);
+    } catch (error) {
+      console.error("Erreur :", error);
+      alert("Erreur lors de la sauvegarde.");
+    }
+  };
+
   useEffect(() => {
     const checkAdmin = async () => {
       const user = auth.currentUser;
@@ -171,10 +193,7 @@ export default function AdminPage() {
               placeholder="Une Queen par ligne"
             />
             <button 
-              onClick={() => {
-                const val = (document.getElementById('queensArea') as HTMLInputElement).value.split('\n');
-                updateList("queens", val);
-              }}
+              onClick={handleSaveQueens}
               className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl"
             >
               Sauvegarder la liste des Queens
