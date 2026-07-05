@@ -40,7 +40,7 @@ const ReglesPage = () => {
           <h2 className="text-2xl font-bold text-purple-700 mb-4">1. Le principe</h2>
           <p className="text-gray-700 leading-relaxed">
             Chaque semaine, à l&apos;approche du nouvel épisode de Drag Race France, tu es invité à faire tes pronostics. 
-            L&apos;objectif est de prédire le déroulement de l\&apos;épisode pour cumuler un maximum de points.
+            L&apos;objectif est de prédire le déroulement de l&apos;épisode pour cumuler un maximum de points.
           </p>
         </section>
 

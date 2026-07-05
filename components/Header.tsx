@@ -12,6 +12,7 @@ export default function Header({ isAdmin }: HeaderProps) {
   const pathname = usePathname();
   const isDashboard = pathname === "/dashboard";
   const isPronostics = pathname === "/pronostics";
+  const isRegles = pathname === "/regles";
 
   return (
     <header className="flex justify-between items-center p-4 bg-white shadow-sm">
@@ -29,6 +30,9 @@ export default function Header({ isAdmin }: HeaderProps) {
           <button onClick={() => router.push("/pronostics")} className="p-2 text-sm text-gray-600">Pronostic</button>
         )}
         <button onClick={() => router.push("/regles")} className="p-2 text-sm text-gray-600">Règles</button>
+        {!isRegles && (
+          <button onClick={() => router.push("/regles")} className="p-2 text-sm text-gray-600">Règles</button>
+        )}
         {isAdmin && (
           <button onClick={() => router.push("/admin")} className="bg-red-500 text-white px-3 py-1 rounded text-gray-900">Admin</button>
         )}
