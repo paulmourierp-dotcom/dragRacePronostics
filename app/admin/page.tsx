@@ -49,7 +49,7 @@ export default function AdminPage() {
     try {
       // Mise à jour dans Firebase
       await updateDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9"), {
-        miniDefis: newValue
+        minidefis: newValue
       });
       
       // Feedback visuel
@@ -71,7 +71,7 @@ export default function AdminPage() {
     try {
       // Mise à jour dans Firebase
       await updateDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9"), {
-        maxiDefis: newValue
+        maxidefis: newValue
       });
       
       // Feedback visuel
