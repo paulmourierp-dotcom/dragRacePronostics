@@ -17,7 +17,7 @@ export default function AdminPage() {
 //   const [users, setUsers] = useState<[]>([]);
   const [users, setUsers] = useState<UserData[]>([]);
   const router = useRouter();
-  
+
   const handleSaveQueens = async () => {
     // On récupère la valeur actuelle dans le textarea
     const textarea = document.getElementById('queensArea') as HTMLTextAreaElement;
@@ -25,7 +25,7 @@ export default function AdminPage() {
 
     try {
       // Mise à jour dans Firebase
-      await updateDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW8"), {
+      await updateDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9"), {
         queens: newValue
       });
       
@@ -47,7 +47,7 @@ export default function AdminPage() {
 
     try {
       // Mise à jour dans Firebase
-      await updateDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW8"), {
+      await updateDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9"), {
         miniDefis: newValue
       });
       
@@ -84,11 +84,11 @@ export default function AdminPage() {
         // Charger la liste des joueurs
         const usersSnap = await getDocs(collection(db, "users"));
         const usersList: UserData[] = [];
-        const listsSnap = await getDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW8"));
+        const listsSnap = await getDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9"));
         if (listsSnap.exists()) {
           const data = listsSnap.data();
           setQueensList(data.queens || []);
-          setMiniDefisList(data.miniDefis || []);
+          setMiniDefisList(data.minidefis || []);
         }
         // usersSnap.forEach(doc => usersList.push({ id: doc.id, ...doc.data() } as UserData));
         usersSnap.forEach((doc) => {
