@@ -12,18 +12,12 @@ export default function AdminPage() {
   const [dateDiffusion, setDateDiffusion] = useState("");
   const [dateLimite, setDateLimite] = useState("");
   const [queensList, setQueensList] = useState<string[]>([]);
+  const [miniDefisList, setMiniDefisList] = useState<string[]>([]);
 //   const [users, setUsers] = useState<any[]>([]);
 //   const [users, setUsers] = useState<[]>([]);
   const [users, setUsers] = useState<UserData[]>([]);
   const router = useRouter();
-
-  const updateList = async (field: string, newValue: string[]) => {
-    await updateDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW8"), {
-      [field]: newValue // Met à jour soit 'queens', 'mini', ou 'maxi'
-    });
-    alert("Liste mise à jour !");
-  };
-
+  
   const handleSaveQueens = async () => {
     // On récupère la valeur actuelle dans le textarea
     const textarea = document.getElementById('queensArea') as HTMLTextAreaElement;
@@ -40,6 +34,28 @@ export default function AdminPage() {
       
       // Optionnel : mettre à jour le state local pour refléter le changement
       setQueensList(newValue);
+    } catch (error) {
+      console.error("Erreur :", error);
+      alert("Erreur lors de la sauvegarde.");
+    }
+  };
+
+  const handleSaveMiniDefis = async () => {
+    // On récupère la valeur actuelle dans le textarea
+    const textarea = document.getElementById('miniDefisArea') as HTMLTextAreaElement;
+    const newValue = textarea.value.split('\n').filter(name => name.trim() !== "");
+
+    try {
+      // Mise à jour dans Firebase
+      await updateDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW8"), {
+        miniDefis: newValue
+      });
+      
+      // Feedback visuel
+      alert("La liste des Mini-Defis a été mise à jour avec succès !");
+      
+      // Optionnel : mettre à jour le state local pour refléter le changement
+      setMiniDefisList(newValue);
     } catch (error) {
       console.error("Erreur :", error);
       alert("Erreur lors de la sauvegarde.");
@@ -72,6 +88,7 @@ export default function AdminPage() {
         if (listsSnap.exists()) {
           const data = listsSnap.data();
           setQueensList(data.queens || []);
+          setMiniDefisList(data.miniDefis || []);
         }
         // usersSnap.forEach(doc => usersList.push({ id: doc.id, ...doc.data() } as UserData));
         usersSnap.forEach((doc) => {
@@ -197,6 +214,22 @@ export default function AdminPage() {
               className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl"
             >
               Sauvegarder la liste des Queens
+            </button>
+          </section>
+
+          <section className="bg-white/95 p-8 rounded-[15px] shadow-lg">
+            <h2 className="text-2xl font-bold text-gray-950 mb-4">Gestion des Mini-Defis</h2>
+            <textarea 
+              defaultValue={miniDefisList.join('\n')}
+              className="w-full h-32 p-3 rounded-xl border border-gray-200 mb-4"
+              id="miniDefisArea"
+              placeholder="Un Mini-Defi par ligne"
+            />
+            <button 
+              onClick={handleSaveMiniDefis}
+              className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl"
+            >
+              Sauvegarder la liste des Mini-Defis
             </button>
           </section>
 
