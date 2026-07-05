@@ -5,12 +5,16 @@ export interface CrownPredictionData {
   userId: string;
   queenPredicted: string;
   createdAt: Timestamp;
+  // Renseigné par l'admin quand la gagnante de la saison est déclarée
+  pointsEarned?: number;
 }
 
 // Document Firestore : config/crown_result — état du pronostic couronne pour la saison
 export interface CrownResultData {
   // Verrouille l'écriture de crownPredictions côté règles Firestore, indépendamment du winner
   locked?: boolean;
+  // Nombre de points attribués aux joueurs ayant correctement deviné la gagnante, modifiable depuis /admin
+  points?: number;
   // Renseignés uniquement une fois la saison terminée
   winner?: string;
   publishedAt?: Timestamp;

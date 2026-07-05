@@ -18,7 +18,8 @@ import { UserData } from "@/types/user";
 import { CrownResultData } from "@/types/crown";
 import { QueenData } from "@/types/gameData";
 import { PredictionData } from "@/types/prediction";
-import { ResultData } from "@/types/result";
+import { ResultData, ScoringRules } from "@/types/result";
+import { CrownPredictionData } from "@/types/crown";
 import { normalizeQueens } from "@/lib/queens";
 import { SCORING_RULES } from "@/lib/scoring";
 import Header from "@/components/Header";
@@ -42,6 +43,7 @@ const computeEpisodePoints = (
   result: ResultData,
   activeQueens: string[]
 ): number => {
+  const rules = result.scoringRules;
   let points = 0;
 
   for (const queen of activeQueens) {
@@ -52,16 +54,36 @@ const computeEpisodePoints = (
       : "safe";
     const guessed = prediction.queensResults[queen] ?? "safe";
     if (guessed === actual) {
-      points += SCORING_RULES[actual];
+      points += rules[actual];
     }
   }
 
-  if (prediction.winner === result.winner) points += SCORING_RULES.gagnante;
-  if (prediction.eliminee === result.eliminee) points += SCORING_RULES.eliminee;
-  if (prediction.miniDefi === result.miniDefi) points += SCORING_RULES.miniDefi;
-  if (prediction.maxiDefi === result.maxiDefi) points += SCORING_RULES.maxiDefi;
+  if (prediction.winner === result.winner) points += rules.gagnante;
+  if (prediction.eliminee === result.eliminee) points += rules.eliminee;
+  if (prediction.miniDefi === result.miniDefi) points += rules.miniDefi;
+  if (prediction.maxiDefi === result.maxiDefi) points += rules.maxiDefi;
 
   return points;
+};
+
+// Recalcule le score total d'un joueur = somme de tous ses pointsEarned
+// (pronostics d'épisodes + pronostic couronne), et le persiste sur users/{uid}.score.
+const recomputeUserScore = async (uid: string): Promise<number> => {
+  const [predsSnap, crownSnap] = await Promise.all([
+    getDocs(query(collection(db, "predictions"), where("userId", "==", uid))),
+    getDoc(doc(db, "crownPredictions", uid)),
+  ]);
+
+  let total = 0;
+  predsSnap.forEach((predDoc) => {
+    total += (predDoc.data() as PredictionData).pointsEarned || 0;
+  });
+  if (crownSnap.exists()) {
+    total += (crownSnap.data() as CrownPredictionData).pointsEarned || 0;
+  }
+
+  await updateDoc(doc(db, "users", uid), { score: total });
+  return total;
 };
 
 export default function AdminPage() {
@@ -74,12 +96,22 @@ export default function AdminPage() {
   const [maxiDefisList, setMaxiDefisList] = useState<string[]>([]);
   const [crownWinner, setCrownWinner] = useState("");
   const [crownLocked, setCrownLocked] = useState(false);
+  const [crownPoints, setCrownPoints] = useState(SCORING_RULES.crown);
   const [users, setUsers] = useState<UserRow[]>([]);
   const [resultsQueensStatus, setResultsQueensStatus] = useState<Record<string, QueenChoice>>({});
   const [resultsWinner, setResultsWinner] = useState<string | null>(null);
   const [resultsEliminee, setResultsEliminee] = useState<string | null>(null);
   const [resultsMiniDefi, setResultsMiniDefi] = useState<string | null>(null);
   const [resultsMaxiDefi, setResultsMaxiDefi] = useState<string | null>(null);
+  const [scoringRules, setScoringRules] = useState<ScoringRules>({
+    top: SCORING_RULES.top,
+    bottom: SCORING_RULES.bottom,
+    safe: SCORING_RULES.safe,
+    gagnante: SCORING_RULES.gagnante,
+    eliminee: SCORING_RULES.eliminee,
+    miniDefi: SCORING_RULES.miniDefi,
+    maxiDefi: SCORING_RULES.maxiDefi,
+  });
   const [savingResults, setSavingResults] = useState(false);
   const router = useRouter();
 
@@ -194,6 +226,7 @@ export default function AdminPage() {
           const data = crownResultDoc.data() as CrownResultData;
           setCrownWinner(data.winner || "");
           setCrownLocked(data.locked ?? false);
+          setCrownPoints(data.points ?? SCORING_RULES.crown);
         }
 
         // Résultats déjà saisis pour l'épisode en cours (pour édition/correction)
@@ -209,6 +242,7 @@ export default function AdminPage() {
             setResultsEliminee(data.eliminee);
             setResultsMiniDefi(data.miniDefi);
             setResultsMaxiDefi(data.maxiDefi);
+            if (data.scoringRules) setScoringRules(data.scoringRules);
           }
         }
 
@@ -247,8 +281,9 @@ export default function AdminPage() {
 
   const handleSaveCrownWinner = async () => {
     try {
-      const payload: { locked: boolean; winner?: string; publishedAt?: Timestamp } = {
+      const payload: { locked: boolean; points: number; winner?: string; publishedAt?: Timestamp } = {
         locked: crownLocked,
+        points: crownPoints,
       };
       // On ne renseigne winner/publishedAt que si une gagnante a été choisie,
       // pour ne pas écraser la date de publication en ne faisant que verrouiller.
@@ -258,6 +293,27 @@ export default function AdminPage() {
       }
 
       await setDoc(doc(db, "config", "crown_result"), payload, { merge: true });
+
+      if (crownWinner) {
+        // Note le score couronne de chaque joueur puis recalcule leur total
+        const batch = writeBatch(db);
+        const crownPredsSnap = await getDocs(collection(db, "crownPredictions"));
+        const affectedUserIds: string[] = [];
+        crownPredsSnap.forEach((predDoc) => {
+          const prediction = predDoc.data() as CrownPredictionData;
+          const points = prediction.queenPredicted === crownWinner ? crownPoints : 0;
+          batch.update(predDoc.ref, { pointsEarned: points });
+          affectedUserIds.push(prediction.userId);
+        });
+        await batch.commit();
+
+        const newScores: Record<string, number> = {};
+        for (const uid of affectedUserIds) {
+          newScores[uid] = await recomputeUserScore(uid);
+        }
+        setUsers((prev) => prev.map((u) => (u.uid in newScores ? { ...u, score: newScores[u.uid] } : u)));
+      }
+
       alert("Informations de la couronne enregistrées !");
     } catch (error) {
       console.error("Erreur :", error);
@@ -299,6 +355,7 @@ export default function AdminPage() {
         winner: resultsWinner,
         miniDefi: resultsMiniDefi,
         maxiDefi: resultsMaxiDefi,
+        scoringRules,
         publishedAt: Timestamp.now(),
       };
 
@@ -324,18 +381,10 @@ export default function AdminPage() {
       await batch.commit();
       setQueensList(updatedQueensList);
 
-      // Recalcule le score total (somme de tous les pointsEarned) de chaque joueur concerné
+      // Recalcule le score total de chaque joueur concerné
       const newScores: Record<string, number> = {};
       for (const uid of affectedUserIds) {
-        const userPredsSnap = await getDocs(
-          query(collection(db, "predictions"), where("userId", "==", uid))
-        );
-        let total = 0;
-        userPredsSnap.forEach((predDoc) => {
-          total += (predDoc.data() as PredictionData).pointsEarned || 0;
-        });
-        newScores[uid] = total;
-        await updateDoc(doc(db, "users", uid), { score: total });
+        newScores[uid] = await recomputeUserScore(uid);
       }
 
       setUsers((prev) => prev.map((u) => (u.uid in newScores ? { ...u, score: newScores[u.uid] } : u)));
@@ -531,6 +580,16 @@ export default function AdminPage() {
                 🔒 Bloquer les pronostics couronne des joueurs
               </label>
 
+              <div className="mb-4">
+                <label className="block text-sm font-bold text-gray-700 mb-1">Points si bien pronostiquée</label>
+                <input
+                  type="number"
+                  value={crownPoints}
+                  onChange={(e) => setCrownPoints(Number(e.target.value))}
+                  className="w-full p-3 rounded-xl border border-gray-200 text-gray-900"
+                />
+              </div>
+
               <button
                 onClick={handleSaveCrownWinner}
                 className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl"
@@ -557,6 +616,35 @@ export default function AdminPage() {
                 values={resultsQueensStatus}
                 onChange={handleResultsQueenChange}
               />
+
+              <div className="mt-4">
+                <p className="text-sm font-bold text-gray-700 mb-2">Barème de points pour cet épisode</p>
+                <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                  {(
+                    [
+                      ["top", "Top"],
+                      ["bottom", "Bottom"],
+                      ["safe", "Safe"],
+                      ["gagnante", "Gagnante"],
+                      ["eliminee", "Éliminée"],
+                      ["miniDefi", "Mini-Défi"],
+                      ["maxiDefi", "Maxi-Défi"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <div key={key}>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">{label}</label>
+                      <input
+                        type="number"
+                        value={scoringRules[key]}
+                        onChange={(e) =>
+                          setScoringRules((prev) => ({ ...prev, [key]: Number(e.target.value) }))
+                        }
+                        className="w-full p-2 rounded-lg border border-gray-200 text-gray-900"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
 
               <div className="grid grid-cols-2 gap-4 mt-4">
                 <div>

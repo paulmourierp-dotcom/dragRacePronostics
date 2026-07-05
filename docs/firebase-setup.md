@@ -58,20 +58,23 @@ eliminee: string
 winner: string
 miniDefi: string
 maxiDefi: string
+scoringRules: { top, bottom, safe, gagnante, eliminee, miniDefi, maxiDefi: number }
 publishedAt: Timestamp
 ```
-Saisi depuis `/admin` (section "Résultats de l'épisode", même tableau que `/pronostics`). À l'enregistrement : la Queen `eliminee` est automatiquement marquée `eliminee: true` dans `game-data.queens`, et `pointsEarned` est recalculé (via `SCORING_RULES` de `lib/scoring.js`) pour tous les `predictions` de cet épisode, puis `users/{uid}.score` est resommé pour chaque joueur concerné (somme de tous ses `pointsEarned`, pas un increment — recalcul complet à chaque validation).
+Saisi depuis `/admin` (section "Résultats de l'épisode", même tableau que `/pronostics`, plus un barème de points modifiable épisode par épisode — pré-rempli avec `SCORING_RULES` de `lib/scoring.js` par défaut). À l'enregistrement : la Queen `eliminee` est automatiquement marquée `eliminee: true` dans `game-data.queens`, et `pointsEarned` est recalculé (avec le `scoringRules` propre à CET épisode, pas un barème global) pour tous les `predictions` de cet épisode, puis `users/{uid}.score` est resommé pour chaque joueur concerné (somme de tous ses `pointsEarned`, épisodes + couronne — pas un increment, recalcul complet à chaque validation, voir `recomputeUserScore` dans `app/admin/page.tsx`).
 
 **`crownPredictions/{uid}`** (`types/crown.ts`, doc ID = uid du joueur)
 ```
 userId: string
 queenPredicted: string
 createdAt: Timestamp
+pointsEarned?: number         // rempli par l'admin quand la gagnante de la saison est déclarée
 ```
 
 **`config/crown_result`** (`types/crown.ts`, `CrownResultData`)
 ```
 locked: boolean              // coché depuis /admin, bloque l'écriture de crownPredictions
+points?: number               // points attribués si bien deviné, modifiable depuis /admin (défaut : SCORING_RULES.crown = 50)
 winner?: string               // renseigné uniquement une fois la saison terminée
 publishedAt?: Timestamp
 ```
