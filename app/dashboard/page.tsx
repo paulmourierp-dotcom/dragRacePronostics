@@ -3,11 +3,11 @@ import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 // import { doc, getDoc, orderBy } from "firebase/firestore";
 import { doc, getDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
-import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { UserData } from "@/types/user"; // Ajuste le chemin selon ton dossier
 import { ConfigData } from "@/types/config"; // Ajuste le chemin selon ton dossier
 import Image from 'next/image';
+import Header from "@/components/Header";
 
 export default function DashboardPage() {
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -55,19 +55,7 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="flex justify-between items-center p-4 bg-white shadow-sm">
-        <img src="/logo.png" alt="Logo" className="h-10" />
-        <div className="flex gap-2">
-          <button onClick={() => router.push("/regles")} className="p-2 text-sm text-gray-600">Règles</button>
-          {userData?.role === "admin" && (
-            <button onClick={() => router.push("/admin")} className="bg-red-500 text-white px-3 py-1 rounded text-gray-900">Admin</button>
-          )}
-          <button onClick={() => signOut(auth)} className="bg-gray-200 px-3 py-1 rounded text-gray-900">
-            Déconnexion
-          </button>
-        </div>
-      </header>
+      <Header isAdmin={userData?.role === "admin"} />
 
       {/* Bienvenue */}
       <h1 className="text-3xl font-bold p-6 text-gray-900">Bienvenue {userData?.surnom || "Queen"} !</h1>

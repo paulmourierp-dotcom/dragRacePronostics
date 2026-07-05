@@ -4,6 +4,7 @@ import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc, collection, getDocs, arrayUnion } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { UserData } from "@/types/user";
+import Header from "@/components/Header";
 
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
@@ -156,126 +157,129 @@ export default function AdminPage() {
   if (!isAdmin) return null;
 
   return (
-    <div className="min-h-screen bg-cover bg-center" style={{ backgroundImage: "url('/fond-login.png')" }}>
-      <div className="min-h-screen bg-gray-950/80 backdrop-blur-sm p-6 md:p-12">
-        
-        <h1 className="text-4xl font-bold text-white mb-10 text-center">Administration</h1>
-
-        <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-8">
+    <>
+      <Header isAdmin={isAdmin} />
+      <div className="min-h-screen bg-cover bg-center" style={{ backgroundImage: "url('/fond-login.png')" }}>
+        <div className="min-h-screen bg-gray-950/80 backdrop-blur-sm p-6 md:p-12">
           
-          {/* Section : Gestion Épisode */}
-          <section className="bg-white/95 p-8 rounded-[15px] shadow-lg">
-            <h2 className="text-2xl font-bold text-gray-950 mb-6">Prochain Épisode</h2>
-            <form onSubmit={handleUpdateEpisode} className="space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Numéro épisode</label>
-                <input 
-                  type="number" 
-                  value={episodeNum}
-                  onChange={(e) => setEpisodeNum(Number(e.target.value))}
-                  className="w-full p-3 rounded-xl border border-gray-200 text-gray-900"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Date de diffusion</label>
-                <input 
-                  type="text" 
-                  value={dateDiffusion}
-                  onChange={(e) => setDateDiffusion(e.target.value)}
-                  placeholder="Ex: 20 Juin 2026"
-                  className="w-full p-3 rounded-xl border border-gray-200 text-gray-900"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Date limite pronostics</label>
-                <input 
-                    type="text" 
-                    value={dateLimite}
-                    onChange={(e) => setDateLimite(e.target.value)}
-                    placeholder="Ex: 19 Juin 2026"
+          <h1 className="text-4xl font-bold text-white mb-10 text-center">Administration</h1>
+
+          <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-8">
+            
+            {/* Section : Gestion Épisode */}
+            <section className="bg-white/95 p-8 rounded-[15px] shadow-lg">
+              <h2 className="text-2xl font-bold text-gray-950 mb-6">Prochain Épisode</h2>
+              <form onSubmit={handleUpdateEpisode} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Numéro épisode</label>
+                  <input 
+                    type="number" 
+                    value={episodeNum}
+                    onChange={(e) => setEpisodeNum(Number(e.target.value))}
                     className="w-full p-3 rounded-xl border border-gray-200 text-gray-900"
-                />
-              </div>
-              <button type="submit" className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl hover:bg-purple-700 transition">
-                Mettre à jour
-              </button>
-            </form>
-          </section>
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Date de diffusion</label>
+                  <input 
+                    type="text" 
+                    value={dateDiffusion}
+                    onChange={(e) => setDateDiffusion(e.target.value)}
+                    placeholder="Ex: 20 Juin 2026"
+                    className="w-full p-3 rounded-xl border border-gray-200 text-gray-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Date limite pronostics</label>
+                  <input 
+                      type="text" 
+                      value={dateLimite}
+                      onChange={(e) => setDateLimite(e.target.value)}
+                      placeholder="Ex: 19 Juin 2026"
+                      className="w-full p-3 rounded-xl border border-gray-200 text-gray-900"
+                  />
+                </div>
+                <button type="submit" className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl hover:bg-purple-700 transition">
+                  Mettre à jour
+                </button>
+              </form>
+            </section>
 
-          {/* Section : Liste des Joueurs */}
-          <section className="bg-white/95 p-8 rounded-[15px] shadow-lg">
-            <h2 className="text-2xl font-bold text-gray-950 mb-6">Joueurs inscrits</h2>
-            <div className="max-h-[400px] overflow-y-auto">
-              <table className="w-full text-left">
-                <thead className="border-b border-gray-100">
-                  <tr>
-                    <th className="py-2 text-gray-500 font-bold uppercase text-xs">Surnom</th>
-                    <th className="py-2 text-gray-500 font-bold uppercase text-xs text-right">Score</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {users.map(u => (
-                    <tr key={u.email}>
-                      <td className="py-3 text-gray-900 font-medium">{u.surnom}</td>
-                      <td className="py-3 text-gray-900 font-bold text-right">{u.score ?? 0} pts</td>
+            {/* Section : Liste des Joueurs */}
+            <section className="bg-white/95 p-8 rounded-[15px] shadow-lg">
+              <h2 className="text-2xl font-bold text-gray-950 mb-6">Joueurs inscrits</h2>
+              <div className="max-h-[400px] overflow-y-auto">
+                <table className="w-full text-left">
+                  <thead className="border-b border-gray-100">
+                    <tr>
+                      <th className="py-2 text-gray-500 font-bold uppercase text-xs">Surnom</th>
+                      <th className="py-2 text-gray-500 font-bold uppercase text-xs text-right">Score</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {users.map(u => (
+                      <tr key={u.email}>
+                        <td className="py-3 text-gray-900 font-medium">{u.surnom}</td>
+                        <td className="py-3 text-gray-900 font-bold text-right">{u.score ?? 0} pts</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
 
-          <section className="bg-white/95 p-8 rounded-[15px] shadow-lg">
-            <h2 className="text-2xl font-bold text-gray-950 mb-4">Gestion des Queens</h2>
-            <textarea 
-              defaultValue={queensList.join('\n')}
-              className="w-full h-32 p-3 rounded-xl border border-gray-200 mb-4"
-              id="queensArea"
-              placeholder="Une Queen par ligne"
-            />
-            <button 
-              onClick={handleSaveQueens}
-              className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl"
-            >
-              Sauvegarder la liste des Queens
-            </button>
-          </section>
+            <section className="bg-white/95 p-8 rounded-[15px] shadow-lg">
+              <h2 className="text-2xl font-bold text-gray-950 mb-4">Gestion des Queens</h2>
+              <textarea 
+                defaultValue={queensList.join('\n')}
+                className="w-full h-32 p-3 rounded-xl border border-gray-200 mb-4"
+                id="queensArea"
+                placeholder="Une Queen par ligne"
+              />
+              <button 
+                onClick={handleSaveQueens}
+                className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl"
+              >
+                Sauvegarder la liste des Queens
+              </button>
+            </section>
 
-          <section className="bg-white/95 p-8 rounded-[15px] shadow-lg">
-            <h2 className="text-2xl font-bold text-gray-950 mb-4">Gestion des Mini-Defis</h2>
-            <textarea 
-              defaultValue={miniDefisList.join('\n')}
-              className="w-full h-32 p-3 rounded-xl border border-gray-200 mb-4"
-              id="miniDefisArea"
-              placeholder="Un Mini-Defi par ligne"
-            />
-            <button 
-              onClick={handleSaveMiniDefis}
-              className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl"
-            >
-              Sauvegarder la liste des Mini-Defis
-            </button>
-          </section>
+            <section className="bg-white/95 p-8 rounded-[15px] shadow-lg">
+              <h2 className="text-2xl font-bold text-gray-950 mb-4">Gestion des Mini-Defis</h2>
+              <textarea 
+                defaultValue={miniDefisList.join('\n')}
+                className="w-full h-32 p-3 rounded-xl border border-gray-200 mb-4"
+                id="miniDefisArea"
+                placeholder="Un Mini-Defi par ligne"
+              />
+              <button 
+                onClick={handleSaveMiniDefis}
+                className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl"
+              >
+                Sauvegarder la liste des Mini-Defis
+              </button>
+            </section>
 
-          <section className="bg-white/95 p-8 rounded-[15px] shadow-lg">
-            <h2 className="text-2xl font-bold text-gray-950 mb-4">Gestion des Maxi-Defis</h2>
-            <textarea 
-              defaultValue={maxiDefisList.join('\n')}
-              className="w-full h-32 p-3 rounded-xl border border-gray-200 mb-4"
-              id="maxiDefisArea"
-              placeholder="Un Maxi-Defi par ligne"
-            />
-            <button 
-              onClick={handleSaveMaxiDefis}
-              className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl"
-            >
-              Sauvegarder la liste des Maxi-Defis
-            </button>
-          </section>
+            <section className="bg-white/95 p-8 rounded-[15px] shadow-lg">
+              <h2 className="text-2xl font-bold text-gray-950 mb-4">Gestion des Maxi-Defis</h2>
+              <textarea 
+                defaultValue={maxiDefisList.join('\n')}
+                className="w-full h-32 p-3 rounded-xl border border-gray-200 mb-4"
+                id="maxiDefisArea"
+                placeholder="Un Maxi-Defi par ligne"
+              />
+              <button 
+                onClick={handleSaveMaxiDefis}
+                className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl"
+              >
+                Sauvegarder la liste des Maxi-Defis
+              </button>
+            </section>
 
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
