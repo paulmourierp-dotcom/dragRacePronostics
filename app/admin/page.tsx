@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, collection, getDocs } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, getDocs, arrayUnion } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { UserData } from "@/types/user";
 
@@ -11,10 +11,18 @@ export default function AdminPage() {
   const [episodeNum, setEpisodeNum] = useState(1);
   const [dateDiffusion, setDateDiffusion] = useState("");
   const [dateLimite, setDateLimite] = useState("");
+  const [queensList, setQueensList] = useState<string[]>([]);
 //   const [users, setUsers] = useState<any[]>([]);
 //   const [users, setUsers] = useState<[]>([]);
   const [users, setUsers] = useState<UserData[]>([]);
   const router = useRouter();
+
+  const updateList = async (field: string, newValue: string[]) => {
+    await updateDoc(doc(db, "game_data", "lists"), {
+      [field]: newValue // Met à jour soit 'queens', 'mini', ou 'maxi'
+    });
+    alert("Liste mise à jour !");
+  };
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -38,6 +46,11 @@ export default function AdminPage() {
         // Charger la liste des joueurs
         const usersSnap = await getDocs(collection(db, "users"));
         const usersList: UserData[] = [];
+        const listsSnap = await getDoc(doc(db, "game_data", "lists"));
+        if (listsSnap.exists()) {
+          const data = listsSnap.data();
+          setQueensList(data.queens || []);
+        }
         // usersSnap.forEach(doc => usersList.push({ id: doc.id, ...doc.data() } as UserData));
         usersSnap.forEach((doc) => {
             const data = doc.data(); // Récupère les données brutes
@@ -147,6 +160,25 @@ export default function AdminPage() {
                 </tbody>
               </table>
             </div>
+          </section>
+
+          <section className="bg-white/95 p-8 rounded-[15px] shadow-lg">
+            <h2 className="text-2xl font-bold text-gray-950 mb-4">Gestion des Queens</h2>
+            <textarea 
+              defaultValue={queensList.join('\n')}
+              className="w-full h-32 p-3 rounded-xl border border-gray-200 mb-4"
+              id="queensArea"
+              placeholder="Une Queen par ligne"
+            />
+            <button 
+              onClick={() => {
+                const val = (document.getElementById('queensArea') as HTMLInputElement).value.split('\n');
+                updateList("queens", val);
+              }}
+              className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl"
+            >
+              Sauvegarder la liste des Queens
+            </button>
           </section>
 
         </div>
