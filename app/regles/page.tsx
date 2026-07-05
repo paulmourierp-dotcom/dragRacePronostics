@@ -8,7 +8,7 @@ const ReglesPage = () => {
   const [userData] = useState<UserData | null>(null);
 
   return (
-    <main className="max-w-4xl mx-auto p-6 md:p-12">
+    <main className="min-h-screen bg-gray-50">
     <Header isAdmin={userData?.role === "admin"} />
       <h1 className="text-4xl font-extrabold text-gray-950 mb-8">Règles du Jeu</h1>
       
