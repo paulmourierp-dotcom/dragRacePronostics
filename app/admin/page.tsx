@@ -5,6 +5,8 @@ import { doc, getDoc, setDoc, updateDoc, collection, getDocs, arrayUnion, Timest
 import { useRouter } from "next/navigation";
 import { UserData } from "@/types/user";
 import { CrownResultData } from "@/types/crown";
+import { QueenData } from "@/types/gameData";
+import { normalizeQueens } from "@/lib/queens";
 import Header from "@/components/Header";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -20,30 +22,43 @@ export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [episodeNum, setEpisodeNum] = useState(1);
   const [dateDiffusion, setDateDiffusion] = useState("");
-  const [queensList, setQueensList] = useState<string[]>([]);
+  const [queensList, setQueensList] = useState<QueenData[]>([]);
   const [miniDefisList, setMiniDefisList] = useState<string[]>([]);
   const [maxiDefisList, setMaxiDefisList] = useState<string[]>([]);
   const [crownWinner, setCrownWinner] = useState("");
+  const [crownLocked, setCrownLocked] = useState(false);
 //   const [users, setUsers] = useState<any[]>([]);
 //   const [users, setUsers] = useState<[]>([]);
   const [users, setUsers] = useState<UserData[]>([]);
   const router = useRouter();
 
+  const handleAddQueenRow = () => {
+    setQueensList((prev) => [...prev, { name: "", eliminee: false }]);
+  };
+
+  const handleQueenNameChange = (index: number, name: string) => {
+    setQueensList((prev) => prev.map((q, i) => (i === index ? { ...q, name } : q)));
+  };
+
+  const handleQueenEliminationToggle = (index: number, eliminee: boolean) => {
+    setQueensList((prev) => prev.map((q, i) => (i === index ? { ...q, eliminee } : q)));
+  };
+
+  const handleRemoveQueenRow = (index: number) => {
+    setQueensList((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSaveQueens = async () => {
-    // On récupère la valeur actuelle dans le textarea
-    const textarea = document.getElementById('queensArea') as HTMLTextAreaElement;
-    const newValue = textarea.value.split('\n').filter(name => name.trim() !== "");
+    const newValue = queensList
+      .map((q) => ({ ...q, name: q.name.trim() }))
+      .filter((q) => q.name !== "");
 
     try {
-      // Mise à jour dans Firebase
       await updateDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9"), {
         queens: newValue
       });
-      
-      // Feedback visuel
+
       alert("La liste des Queens a été mise à jour avec succès !");
-      
-      // Optionnel : mettre à jour le state local pour refléter le changement
       setQueensList(newValue);
     } catch (error) {
       console.error("Erreur :", error);
@@ -120,14 +135,16 @@ export default function AdminPage() {
         const listsSnap = await getDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9"));
         if (listsSnap.exists()) {
           const data = listsSnap.data();
-          setQueensList(data.queens || []);
+          setQueensList(normalizeQueens(data.queens || []));
           setMiniDefisList(data.minidefis || []);
           setMaxiDefisList(data.maxidefis || []);
         }
 
         const crownResultDoc = await getDoc(doc(db, "config", "crown_result"));
         if (crownResultDoc.exists()) {
-          setCrownWinner((crownResultDoc.data() as CrownResultData).winner);
+          const data = crownResultDoc.data() as CrownResultData;
+          setCrownWinner(data.winner || "");
+          setCrownLocked(data.locked ?? false);
         }
         // usersSnap.forEach(doc => usersList.push({ id: doc.id, ...doc.data() } as UserData));
         usersSnap.forEach((doc) => {
@@ -154,14 +171,19 @@ export default function AdminPage() {
   }, [router]);
 
   const handleSaveCrownWinner = async () => {
-    if (!crownWinner) return;
-
     try {
-      await setDoc(doc(db, "config", "crown_result"), {
-        winner: crownWinner,
-        publishedAt: Timestamp.now(),
-      });
-      alert("Gagnante de la saison enregistrée !");
+      const payload: { locked: boolean; winner?: string; publishedAt?: Timestamp } = {
+        locked: crownLocked,
+      };
+      // On ne renseigne winner/publishedAt que si une gagnante a été choisie,
+      // pour ne pas écraser la date de publication en ne faisant que verrouiller.
+      if (crownWinner) {
+        payload.winner = crownWinner;
+        payload.publishedAt = Timestamp.now();
+      }
+
+      await setDoc(doc(db, "config", "crown_result"), payload, { merge: true });
+      alert("Informations de la couronne enregistrées !");
     } catch (error) {
       console.error("Erreur :", error);
       alert("Erreur lors de la sauvegarde.");
@@ -250,13 +272,42 @@ export default function AdminPage() {
 
             <section className="bg-white/95 p-8 rounded-[15px] shadow-lg">
               <h2 className="text-2xl font-bold text-gray-950 mb-4">Gestion des Queens</h2>
-              <textarea 
-                defaultValue={queensList.join('\n')}
-                className="w-full h-32 p-3 rounded-xl border border-gray-200 mb-4"
-                id="queensArea"
-                placeholder="Une Queen par ligne"
-              />
-              <button 
+              <div className="space-y-2 mb-4 max-h-80 overflow-y-auto">
+                {queensList.map((queen, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={queen.name}
+                      onChange={(e) => handleQueenNameChange(index, e.target.value)}
+                      placeholder="Nom de la Queen"
+                      className="flex-1 p-2 rounded-lg border border-gray-200 text-gray-900"
+                    />
+                    <label className="flex items-center gap-1 text-sm text-gray-700 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={queen.eliminee}
+                        onChange={(e) => handleQueenEliminationToggle(index, e.target.checked)}
+                        className="w-4 h-4"
+                      />
+                      Éliminée
+                    </label>
+                    <button
+                      onClick={() => handleRemoveQueenRow(index)}
+                      className="text-red-600 font-bold px-2"
+                      title="Retirer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={handleAddQueenRow}
+                className="w-full bg-gray-200 text-gray-900 font-bold py-2 rounded-xl mb-2"
+              >
+                + Ajouter une Queen
+              </button>
+              <button
                 onClick={handleSaveQueens}
                 className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl"
               >
@@ -304,18 +355,31 @@ export default function AdminPage() {
                 className="w-full p-3 rounded-xl border border-gray-200 text-gray-900 mb-4"
               >
                 <option value="">-- Choisis une Queen --</option>
-                {queensList.map((queen) => (
-                  <option key={queen} value={queen}>{queen}</option>
+                {queensList.filter((q) => !q.eliminee).map((queen) => (
+                  <option key={queen.name} value={queen.name}>{queen.name}</option>
                 ))}
               </select>
+
+              <label className="flex items-center gap-2 mb-4 text-gray-900 font-medium">
+                <input
+                  type="checkbox"
+                  checked={crownLocked}
+                  onChange={(e) => setCrownLocked(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                🔒 Bloquer les pronostics couronne des joueurs
+              </label>
+
               <button
                 onClick={handleSaveCrownWinner}
                 className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl"
               >
-                Sauvegarder la gagnante de la saison
+                Sauvegarder
               </button>
               <p className="text-xs text-gray-500 mt-2">
-                À renseigner une fois la saison terminée. Ce champ fait foi pour comparer aux pronostics couronne des joueurs.
+                La gagnante n&apos;est à renseigner qu&apos;une fois la saison terminée. La case à cocher
+                bloque immédiatement les pronostics couronne des joueurs (ex. dès la diffusion de l&apos;épisode 1),
+                indépendamment de la gagnante.
               </p>
             </section>
 

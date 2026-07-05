@@ -6,6 +6,8 @@ import { doc, getDoc, collection, getDocs, query, orderBy, Timestamp } from "fir
 import { useRouter } from "next/navigation";
 import { UserData } from "@/types/user"; // Ajuste le chemin selon ton dossier
 import { ConfigData } from "@/types/config"; // Ajuste le chemin selon ton dossier
+import { CrownResultData } from "@/types/crown";
+import { normalizeQueens } from "@/lib/queens";
 import Image from 'next/image';
 import Header from "@/components/Header";
 import CrownPredictionModal from "@/components/CrownPredictionModal";
@@ -25,6 +27,7 @@ export default function DashboardPage() {
   const [myRank, setMyRank] = useState<number>(0);
   const [nextEpisodeData, setNextEpisodeData] = useState<ConfigData | null>(null);
   const [queens, setQueens] = useState<string[]>([]);
+  const [crownLocked, setCrownLocked] = useState(false);
   const [showCrownModal, setShowCrownModal] = useState(false);
 
     useEffect(() => {
@@ -60,10 +63,19 @@ export default function DashboardPage() {
             setNextEpisodeData(configSnap.data() as ConfigData);
             }
 
-            // 4. Récupérer la liste des Queens (pour le pronostic couronne)
+            // 4. Récupérer la liste des Queens encore en course (pour le pronostic couronne)
             const queensSnap = await getDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9"));
             if (queensSnap.exists()) {
-            setQueens(queensSnap.data().queens || []);
+            const activeQueens = normalizeQueens(queensSnap.data().queens || [])
+              .filter((q) => !q.eliminee)
+              .map((q) => q.name);
+            setQueens(activeQueens);
+            }
+
+            // 5. Savoir si les pronostics couronne sont verrouillés par l'admin
+            const crownResultSnap = await getDoc(doc(db, "config", "crown_result"));
+            if (crownResultSnap.exists()) {
+            setCrownLocked((crownResultSnap.data() as CrownResultData).locked ?? false);
             }
         };
 
@@ -161,16 +173,21 @@ export default function DashboardPage() {
             <div className="bg-white p-6 rounded shadow text-center rounded-xl">
                 <button
                 onClick={() => setShowCrownModal(true)}
-                className="bg-purple-600 text-white w-full py-4 rounded font-bold text-gray-900"
+                disabled={crownLocked}
+                className="bg-purple-600 text-white w-full py-4 rounded font-bold text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                👑 Pronostiquer la gagnante de la saison
+                👑 {crownLocked ? "Pronostics couronne clos" : "Pronostiquer la gagnante de la saison"}
                 </button>
             </div>
         </section>
       </div>
 
       {showCrownModal && (
-        <CrownPredictionModal queens={queens} onClose={() => setShowCrownModal(false)} />
+        <CrownPredictionModal
+          queens={queens}
+          locked={crownLocked}
+          onClose={() => setShowCrownModal(false)}
+        />
       )}
     </main>
   );

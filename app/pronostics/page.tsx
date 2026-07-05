@@ -5,19 +5,27 @@ import { auth, db } from "@/lib/firebase";
 import { ConfigData } from "@/types/config";
 import { PredictionData } from "@/types/prediction";
 import { UserData } from "@/types/user";
+import { QueenData } from "@/types/gameData";
+import { normalizeQueens } from "@/lib/queens";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 
 type QueenChoice = "top" | "bottom" | "";
 
 export default function PronosticPage() {
   const [userData, setUserData] = useState<UserData | null>(null);
-  const [queens, setQueens] = useState<string[]>([]);
+  const [queens, setQueens] = useState<QueenData[]>([]);
+  const [brokenImages, setBrokenImages] = useState<Set<string>>(new Set());
   const [episodeNum, setEpisodeNum] = useState<number | null>(null);
-  const [dateDiffusion, setDateDiffusion] = useState<Date | null>(null);
+  const [isPastDeadline, setIsPastDeadline] = useState(false);
   const [queensResults, setQueensResults] = useState<Record<string, "top" | "bottom">>({});
   const [winner, setWinner] = useState<string | null>(null);
   const [loser, setLoser] = useState<string | null>(null);
+  const [miniDefisOptions, setMiniDefisOptions] = useState<string[]>([]);
+  const [maxiDefisOptions, setMaxiDefisOptions] = useState<string[]>([]);
+  const [miniDefi, setMiniDefi] = useState<string | null>(null);
+  const [maxiDefi, setMaxiDefi] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -38,10 +46,14 @@ export default function PronosticPage() {
       const nextEpisode = nextEpisodeSnap.exists() ? (nextEpisodeSnap.data() as ConfigData) : null;
       const numero = nextEpisode?.numero ?? null;
       setEpisodeNum(numero);
-      setDateDiffusion(nextEpisode?.dateDiffusion ? nextEpisode.dateDiffusion.toDate() : null);
+      const episodeDate = nextEpisode?.dateDiffusion ? nextEpisode.dateDiffusion.toDate() : null;
+      setIsPastDeadline(episodeDate !== null && episodeDate.getTime() < Date.now());
 
       if (queensSnap.exists()) {
-        setQueens((queensSnap.data().queens as string[]) || []);
+        const gameData = queensSnap.data();
+        setQueens(normalizeQueens(gameData.queens || []));
+        setMiniDefisOptions(gameData.minidefis || []);
+        setMaxiDefisOptions(gameData.maxidefis || []);
       }
 
       if (numero !== null) {
@@ -51,6 +63,8 @@ export default function PronosticPage() {
           setQueensResults(data.queensResults || {});
           setWinner(data.winner ?? null);
           setLoser(data.eliminee ?? null);
+          setMiniDefi(data.miniDefi ?? null);
+          setMaxiDefi(data.maxiDefi ?? null);
         }
       }
 
@@ -60,13 +74,13 @@ export default function PronosticPage() {
     fetchData();
   }, []);
 
-  const isPastDeadline = dateDiffusion !== null && dateDiffusion.getTime() < Date.now();
+  const activeQueens = queens.filter((q) => !q.eliminee).map((q) => q.name);
 
   const topCount = Object.values(queensResults).filter((v) => v === "top").length;
   const bottomCount = Object.values(queensResults).filter((v) => v === "bottom").length;
   const allSelected = topCount === 2 && bottomCount === 2;
-  const topQueens = queens.filter((q) => queensResults[q] === "top");
-  const bottomQueens = queens.filter((q) => queensResults[q] === "bottom");
+  const topQueens = activeQueens.filter((q) => queensResults[q] === "top");
+  const bottomQueens = activeQueens.filter((q) => queensResults[q] === "bottom");
 
   const isOptionDisabled = (queen: string, option: "top" | "bottom") => {
     const count = option === "top" ? topCount : bottomCount;
@@ -102,8 +116,9 @@ export default function PronosticPage() {
           episodeId: episodeNum,
           queensResults,
           winner,
-          // nommé "eliminee" pour matcher le vocabulaire de lib/scoring.js
           eliminee: loser,
+          miniDefi,
+          maxiDefi,
           updatedAt: new Date(),
         },
         { merge: true }
@@ -165,16 +180,32 @@ export default function PronosticPage() {
             <table className="w-full text-center">
               <thead>
                 <tr>
-                  {queens.map((queen) => (
+                  {activeQueens.map((queen) => (
                     <th key={queen} className="p-2 text-gray-900 font-bold border-b border-gray-100">
-                      {queen}
+                      <div className="flex flex-col items-center gap-2">
+                        <span>{queen}</span>
+                        {!brokenImages.has(queen) && (
+                          <div className="relative w-16 h-16 rounded overflow-hidden bg-gray-100">
+                            <Image
+                              src={`/${encodeURIComponent(queen)}.jpeg`}
+                              alt={queen}
+                              fill
+                              sizes="64px"
+                              className="object-cover"
+                              onError={() =>
+                                setBrokenImages((prev) => new Set(prev).add(queen))
+                              }
+                            />
+                          </div>
+                        )}
+                      </div>
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  {queens.map((queen) => (
+                  {activeQueens.map((queen) => (
                     <td key={queen} className="p-2">
                       <select
                         value={queensResults[queen] || ""}
@@ -190,6 +221,38 @@ export default function PronosticPage() {
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Mini-Défi &amp; Maxi-Défi</h2>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Mini-Défi</label>
+                <select
+                  value={miniDefi || ""}
+                  onChange={(e) => setMiniDefi(e.target.value || null)}
+                  className="w-full border border-gray-200 rounded p-2 text-gray-900"
+                >
+                  <option value="">--</option>
+                  {miniDefisOptions.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Maxi-Défi</label>
+                <select
+                  value={maxiDefi || ""}
+                  onChange={(e) => setMaxiDefi(e.target.value || null)}
+                  className="w-full border border-gray-200 rounded p-2 text-gray-900"
+                >
+                  <option value="">--</option>
+                  {maxiDefisOptions.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
 
           {allSelected && (

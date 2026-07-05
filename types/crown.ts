@@ -7,8 +7,11 @@ export interface CrownPredictionData {
   createdAt: Timestamp;
 }
 
-// Document Firestore : config/crown_result — la gagnante réelle de la saison (saisie en fin de saison)
+// Document Firestore : config/crown_result — état du pronostic couronne pour la saison
 export interface CrownResultData {
-  winner: string;
-  publishedAt: Timestamp;
+  // Verrouille l'écriture de crownPredictions côté règles Firestore, indépendamment du winner
+  locked?: boolean;
+  // Renseignés uniquement une fois la saison terminée
+  winner?: string;
+  publishedAt?: Timestamp;
 }

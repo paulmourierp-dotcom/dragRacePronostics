@@ -4,6 +4,8 @@ export interface PredictionData {
   queensResults: Record<string, "top" | "bottom">;
   winner: string | null;
   eliminee: string | null;
+  miniDefi: string | null;
+  maxiDefi: string | null;
   pointsEarned?: number;
   updatedAt?: Date;
 }

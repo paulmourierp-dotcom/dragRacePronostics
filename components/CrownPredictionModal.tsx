@@ -6,10 +6,11 @@ import { CrownPredictionData } from "@/types/crown";
 
 interface CrownPredictionModalProps {
   queens: string[];
+  locked: boolean;
   onClose: () => void;
 }
 
-export default function CrownPredictionModal({ queens, onClose }: CrownPredictionModalProps) {
+export default function CrownPredictionModal({ queens, locked, onClose }: CrownPredictionModalProps) {
   const [queenPredicted, setQueenPredicted] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -31,7 +32,7 @@ export default function CrownPredictionModal({ queens, onClose }: CrownPredictio
 
   const handleSave = async () => {
     const user = auth.currentUser;
-    if (!user || !queenPredicted) return;
+    if (!user || !queenPredicted || locked) return;
 
     setSaving(true);
     try {
@@ -55,13 +56,20 @@ export default function CrownPredictionModal({ queens, onClose }: CrownPredictio
       <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
         <h2 className="text-xl font-bold text-gray-900 mb-4">Qui gagnera la couronne cette saison ?</h2>
 
+        {locked && (
+          <p className="text-sm text-red-600 font-semibold mb-4">
+            Les pronostics couronne sont clos, tu ne peux plus les modifier.
+          </p>
+        )}
+
         {loading ? (
           <p className="text-gray-500 mb-4">Chargement...</p>
         ) : (
           <select
             value={queenPredicted}
             onChange={(e) => setQueenPredicted(e.target.value)}
-            className="w-full border border-gray-200 rounded p-2 text-gray-900 mb-4"
+            disabled={locked}
+            className="w-full border border-gray-200 rounded p-2 text-gray-900 mb-4 disabled:opacity-50"
           >
             <option value="">-- Choisis une Queen --</option>
             {queens.map((queen) => (
@@ -72,11 +80,11 @@ export default function CrownPredictionModal({ queens, onClose }: CrownPredictio
 
         <div className="flex gap-2 justify-end">
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-gray-700 font-bold">
-            Annuler
+            {locked ? "Fermer" : "Annuler"}
           </button>
           <button
             onClick={handleSave}
-            disabled={saving || loading || !queenPredicted}
+            disabled={saving || loading || !queenPredicted || locked}
             className="bg-purple-600 text-white font-bold px-4 py-2 rounded-xl disabled:opacity-50"
           >
             {saving ? "Enregistrement..." : "Sauvegarder"}
