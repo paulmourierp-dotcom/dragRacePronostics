@@ -1,11 +1,33 @@
 "use client";
 
 import Header from '@/components/Header';
+import { auth, db } from '@/lib/firebase';
 import { UserData } from '@/types/user';
-import React, { useState } from 'react';
+import { doc, getDoc } from '@firebase/firestore';
+import React, { useEffect, useState } from 'react';
 
 const ReglesPage = () => {
-  const [userData] = useState<UserData | null>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
+
+  useEffect(() => {
+        const fetchData = async () => {
+            // 1. Récupérer mon profil
+            const user = auth.currentUser;
+            if (!user) return;
+            
+            const userDoc = await getDoc(doc(db, "users", user.uid));
+            const myData = userDoc.data();
+            if (myData) {
+            // On caste 'myData' en 'UserData' uniquement si il existe
+            setUserData(myData as UserData);
+            } else {
+            // Si le document est vide en base, on met 'null'
+            setUserData(null);
+            }
+        };
+
+        fetchData();
+    }, []);
 
   return (
     <main className="min-h-screen bg-gray-50">
