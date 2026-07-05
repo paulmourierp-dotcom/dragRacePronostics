@@ -13,6 +13,7 @@ export default function AdminPage() {
   const [dateLimite, setDateLimite] = useState("");
   const [queensList, setQueensList] = useState<string[]>([]);
   const [miniDefisList, setMiniDefisList] = useState<string[]>([]);
+  const [maxiDefisList, setMaxiDefisList] = useState<string[]>([]);
 //   const [users, setUsers] = useState<any[]>([]);
 //   const [users, setUsers] = useState<[]>([]);
   const [users, setUsers] = useState<UserData[]>([]);
@@ -62,6 +63,28 @@ export default function AdminPage() {
     }
   };
 
+  const handleSaveMaxiDefis = async () => {
+    // On récupère la valeur actuelle dans le textarea
+    const textarea = document.getElementById('maxiDefisArea') as HTMLTextAreaElement;
+    const newValue = textarea.value.split('\n').filter(name => name.trim() !== "");
+
+    try {
+      // Mise à jour dans Firebase
+      await updateDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9"), {
+        maxiDefis: newValue
+      });
+      
+      // Feedback visuel
+      alert("La liste des Maxi-Defis a été mise à jour avec succès !");
+      
+      // Optionnel : mettre à jour le state local pour refléter le changement
+      setMaxiDefisList(newValue);
+    } catch (error) {
+      console.error("Erreur :", error);
+      alert("Erreur lors de la sauvegarde.");
+    }
+  };
+
   useEffect(() => {
     const checkAdmin = async () => {
       const user = auth.currentUser;
@@ -89,6 +112,7 @@ export default function AdminPage() {
           const data = listsSnap.data();
           setQueensList(data.queens || []);
           setMiniDefisList(data.minidefis || []);
+          setMaxiDefisList(data.maxidefis || []);
         }
         // usersSnap.forEach(doc => usersList.push({ id: doc.id, ...doc.data() } as UserData));
         usersSnap.forEach((doc) => {
@@ -230,6 +254,22 @@ export default function AdminPage() {
               className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl"
             >
               Sauvegarder la liste des Mini-Defis
+            </button>
+          </section>
+
+          <section className="bg-white/95 p-8 rounded-[15px] shadow-lg">
+            <h2 className="text-2xl font-bold text-gray-950 mb-4">Gestion des Maxi-Defis</h2>
+            <textarea 
+              defaultValue={maxiDefisList.join('\n')}
+              className="w-full h-32 p-3 rounded-xl border border-gray-200 mb-4"
+              id="maxiDefisArea"
+              placeholder="Un Maxi-Defi par ligne"
+            />
+            <button 
+              onClick={handleSaveMaxiDefis}
+              className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl"
+            >
+              Sauvegarder la liste des Maxi-Defis
             </button>
           </section>
 
