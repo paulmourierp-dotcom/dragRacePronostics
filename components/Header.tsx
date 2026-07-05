@@ -29,7 +29,6 @@ export default function Header({ isAdmin }: HeaderProps) {
         {!isPronostics && (
           <button onClick={() => router.push("/pronostics")} className="p-2 text-sm text-gray-600">Pronostic</button>
         )}
-        <button onClick={() => router.push("/regles")} className="p-2 text-sm text-gray-600">Règles</button>
         {!isRegles && (
           <button onClick={() => router.push("/regles")} className="p-2 text-sm text-gray-600">Règles</button>
         )}
