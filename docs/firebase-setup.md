@@ -40,7 +40,7 @@ Pour référence (ça correspond aux types dans `types/`) :
 ```
 userId: string
 episodeId: number
-queensResults: { [nomQueen]: "top" | "bottom" }
+queensResults: { [nomQueen]: "top" | "bottom" | "safe" }
 winner: string | null
 eliminee: string | null
 miniDefi: string | null           // choisi parmi game-data.minidefis
@@ -56,8 +56,11 @@ top: [string, string]
 bottom: [string, string]
 eliminee: string
 winner: string
+miniDefi: string
+maxiDefi: string
 publishedAt: Timestamp
 ```
+Saisi depuis `/admin` (section "Résultats de l'épisode", même tableau que `/pronostics`). À l'enregistrement : la Queen `eliminee` est automatiquement marquée `eliminee: true` dans `game-data.queens`, et `pointsEarned` est recalculé (via `SCORING_RULES` de `lib/scoring.js`) pour tous les `predictions` de cet épisode, puis `users/{uid}.score` est resommé pour chaque joueur concerné (somme de tous ses `pointsEarned`, pas un increment — recalcul complet à chaque validation).
 
 **`crownPredictions/{uid}`** (`types/crown.ts`, doc ID = uid du joueur)
 ```

@@ -176,7 +176,7 @@ export default function DashboardPage() {
                 disabled={crownLocked}
                 className="bg-purple-600 text-white w-full py-4 rounded font-bold text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                👑 {crownLocked ? "Pronostics couronne clos" : "Pronostiquer la gagnante de la saison"}
+                {crownLocked ? "Pronostics couronne clos" : "Pronostiquer la gagnante de la saison"}
                 </button>
             </div>
         </section>

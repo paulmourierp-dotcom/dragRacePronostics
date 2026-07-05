@@ -9,17 +9,14 @@ import { QueenData } from "@/types/gameData";
 import { normalizeQueens } from "@/lib/queens";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
-import Image from "next/image";
-
-type QueenChoice = "top" | "bottom" | "";
+import QueensSelectTable, { QueenChoice } from "@/components/QueensSelectTable";
 
 export default function PronosticPage() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [queens, setQueens] = useState<QueenData[]>([]);
-  const [brokenImages, setBrokenImages] = useState<Set<string>>(new Set());
   const [episodeNum, setEpisodeNum] = useState<number | null>(null);
   const [isPastDeadline, setIsPastDeadline] = useState(false);
-  const [queensResults, setQueensResults] = useState<Record<string, "top" | "bottom">>({});
+  const [queensResults, setQueensResults] = useState<Record<string, QueenChoice>>({});
   const [winner, setWinner] = useState<string | null>(null);
   const [loser, setLoser] = useState<string | null>(null);
   const [miniDefisOptions, setMiniDefisOptions] = useState<string[]>([]);
@@ -82,21 +79,8 @@ export default function PronosticPage() {
   const topQueens = activeQueens.filter((q) => queensResults[q] === "top");
   const bottomQueens = activeQueens.filter((q) => queensResults[q] === "bottom");
 
-  const isOptionDisabled = (queen: string, option: "top" | "bottom") => {
-    const count = option === "top" ? topCount : bottomCount;
-    return count >= 2 && queensResults[queen] !== option;
-  };
-
   const handleQueenChange = (queen: string, value: QueenChoice) => {
-    setQueensResults((prev) => {
-      const updated = { ...prev };
-      if (value === "") {
-        delete updated[queen];
-      } else {
-        updated[queen] = value;
-      }
-      return updated;
-    });
+    setQueensResults((prev) => ({ ...prev, [queen]: value }));
 
     // Une Queen qui change de statut ne peut plus rester gagnante/éliminée
     if (winner === queen && value !== "top") setWinner(null);
@@ -176,52 +160,12 @@ export default function PronosticPage() {
             Pronostics - Épisode {episodeNum}
           </h1>
 
-          <div className="overflow-x-auto bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-            <table className="w-full text-center">
-              <thead>
-                <tr>
-                  {activeQueens.map((queen) => (
-                    <th key={queen} className="p-2 text-gray-900 font-bold border-b border-gray-100">
-                      <div className="flex flex-col items-center gap-2">
-                        <span>{queen}</span>
-                        {!brokenImages.has(queen) && (
-                          <div className="relative w-16 h-16 rounded overflow-hidden bg-gray-100">
-                            <Image
-                              src={`/${encodeURIComponent(queen)}.jpeg`}
-                              alt={queen}
-                              fill
-                              sizes="64px"
-                              className="object-cover"
-                              onError={() =>
-                                setBrokenImages((prev) => new Set(prev).add(queen))
-                              }
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  {activeQueens.map((queen) => (
-                    <td key={queen} className="p-2">
-                      <select
-                        value={queensResults[queen] || ""}
-                        onChange={(e) => handleQueenChange(queen, e.target.value as QueenChoice)}
-                        className="border border-gray-200 rounded p-1 text-gray-900"
-                      >
-                        <option value="">--</option>
-                        <option value="top" disabled={isOptionDisabled(queen, "top")}>Top</option>
-                        <option value="bottom" disabled={isOptionDisabled(queen, "bottom")}>Bottom</option>
-                      </select>
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <QueensSelectTable
+            queens={activeQueens}
+            values={queensResults}
+            onChange={handleQueenChange}
+            showImages
+          />
 
           <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Mini-Défi &amp; Maxi-Défi</h2>
@@ -299,7 +243,7 @@ export default function PronosticPage() {
               disabled={saving}
               className="flex items-center gap-2 bg-purple-600 text-white font-bold px-4 py-2 rounded-xl disabled:opacity-50"
             >
-              💾 {saving ? "Enregistrement..." : "Sauvegarder"}
+              {saving ? "Enregistrement..." : "Sauvegarder"}
             </button>
           </div>
         </div>

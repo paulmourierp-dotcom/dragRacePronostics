@@ -11,6 +11,7 @@ export default function Header({ isAdmin }: HeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const isDashboard = pathname === "/dashboard";
+  const isPronostics = pathname === "/pronostics";
 
   return (
     <header className="flex justify-between items-center p-4 bg-white shadow-sm">
@@ -23,6 +24,9 @@ export default function Header({ isAdmin }: HeaderProps) {
       <div className="flex gap-2">
         {!isDashboard && (
           <button onClick={() => router.push("/dashboard")} className="p-2 text-sm text-gray-600">Dashboard</button>
+        )}
+        {!isPronostics && (
+          <button onClick={() => router.push("/pronostics")} className="p-2 text-sm text-gray-600">Pronostic</button>
         )}
         <button onClick={() => router.push("/regles")} className="p-2 text-sm text-gray-600">Règles</button>
         {isAdmin && (

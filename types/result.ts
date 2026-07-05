@@ -7,5 +7,7 @@ export interface ResultData {
   bottom: [string, string];
   eliminee: string;
   winner: string;
+  miniDefi: string;
+  maxiDefi: string;
   publishedAt: Timestamp;
 }
