@@ -25,21 +25,27 @@ export default function AdminPage() {
   };
 
   const handleSaveQueens = async () => {
-    // On récupère la valeur actuelle dans le textarea
     const textarea = document.getElementById('queensArea') as HTMLTextAreaElement;
     const newValue = textarea.value.split('\n').filter(name => name.trim() !== "");
 
     try {
-      // Mise à jour dans Firebase
-      await updateDoc(doc(db, "game_data", "lists"), {
-        queens: newValue
-      });
+      // 1. On récupère la collection
+      const querySnapshot = await getDocs(collection(db, "game_data"));
       
-      // Feedback visuel
-      alert("La liste des Queens a été mise à jour avec succès !");
-      
-      // Optionnel : mettre à jour le state local pour refléter le changement
-      setQueensList(newValue);
+      // 2. On prend le premier document trouvé dans la collection
+      if (!querySnapshot.empty) {
+        const docRef = querySnapshot.docs[0].ref;
+        
+        // 3. On met à jour ce document
+        await updateDoc(docRef, {
+          queens: newValue
+        });
+        
+        alert("La liste des Queens a été mise à jour !");
+        setQueensList(newValue);
+      } else {
+        alert("Aucun document trouvé dans game-data !");
+      }
     } catch (error) {
       console.error("Erreur :", error);
       alert("Erreur lors de la sauvegarde.");
