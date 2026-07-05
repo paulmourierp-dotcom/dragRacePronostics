@@ -18,34 +18,28 @@ export default function AdminPage() {
   const router = useRouter();
 
   const updateList = async (field: string, newValue: string[]) => {
-    await updateDoc(doc(db, "game_data", "lists"), {
+    await updateDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW8"), {
       [field]: newValue // Met à jour soit 'queens', 'mini', ou 'maxi'
     });
     alert("Liste mise à jour !");
   };
 
   const handleSaveQueens = async () => {
+    // On récupère la valeur actuelle dans le textarea
     const textarea = document.getElementById('queensArea') as HTMLTextAreaElement;
     const newValue = textarea.value.split('\n').filter(name => name.trim() !== "");
 
     try {
-      // 1. On récupère la collection
-      const querySnapshot = await getDocs(collection(db, "game_data"));
+      // Mise à jour dans Firebase
+      await updateDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW8"), {
+        queens: newValue
+      });
       
-      // 2. On prend le premier document trouvé dans la collection
-      if (!querySnapshot.empty) {
-        const docRef = querySnapshot.docs[0].ref;
-        
-        // 3. On met à jour ce document
-        await updateDoc(docRef, {
-          queens: newValue
-        });
-        
-        alert("La liste des Queens a été mise à jour !");
-        setQueensList(newValue);
-      } else {
-        alert("Aucun document trouvé dans game-data !");
-      }
+      // Feedback visuel
+      alert("La liste des Queens a été mise à jour avec succès !");
+      
+      // Optionnel : mettre à jour le state local pour refléter le changement
+      setQueensList(newValue);
     } catch (error) {
       console.error("Erreur :", error);
       alert("Erreur lors de la sauvegarde.");
@@ -74,7 +68,7 @@ export default function AdminPage() {
         // Charger la liste des joueurs
         const usersSnap = await getDocs(collection(db, "users"));
         const usersList: UserData[] = [];
-        const listsSnap = await getDoc(doc(db, "game_data", "lists"));
+        const listsSnap = await getDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW8"));
         if (listsSnap.exists()) {
           const data = listsSnap.data();
           setQueensList(data.queens || []);
