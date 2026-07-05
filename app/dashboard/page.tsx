@@ -2,12 +2,21 @@
 import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 // import { doc, getDoc, orderBy } from "firebase/firestore";
-import { doc, getDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, query, orderBy, Timestamp } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { UserData } from "@/types/user"; // Ajuste le chemin selon ton dossier
 import { ConfigData } from "@/types/config"; // Ajuste le chemin selon ton dossier
 import Image from 'next/image';
 import Header from "@/components/Header";
+import CrownPredictionModal from "@/components/CrownPredictionModal";
+
+const formatDateDiffusion = (timestamp?: Timestamp) =>
+  timestamp
+    ? timestamp.toDate().toLocaleString("fr-FR", {
+        dateStyle: "long",
+        timeStyle: "short",
+      })
+    : "";
 
 export default function DashboardPage() {
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -15,39 +24,47 @@ export default function DashboardPage() {
   const [allPlayers, setAllPlayers] = useState<UserData[]>([]);
   const [myRank, setMyRank] = useState<number>(0);
   const [nextEpisodeData, setNextEpisodeData] = useState<ConfigData | null>(null);
+  const [queens, setQueens] = useState<string[]>([]);
+  const [showCrownModal, setShowCrownModal] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
-        // 1. Récupérer mon profil
-        const user = auth.currentUser;
-        if (!user) return;
-        
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        const myData = userDoc.data();
-        if (myData) {
-        // On caste 'myData' en 'UserData' uniquement si il existe
-        setUserData(myData as UserData);
-        } else {
-        // Si le document est vide en base, on met 'null'
-        setUserData(null);
-        }
+            // 1. Récupérer mon profil
+            const user = auth.currentUser;
+            if (!user) return;
+            
+            const userDoc = await getDoc(doc(db, "users", user.uid));
+            const myData = userDoc.data();
+            if (myData) {
+            // On caste 'myData' en 'UserData' uniquement si il existe
+            setUserData(myData as UserData);
+            } else {
+            // Si le document est vide en base, on met 'null'
+            setUserData(null);
+            }
 
-        // 2. Récupérer tous les joueurs triés par score
-        const q = query(collection(db, "users"), orderBy("score", "desc"));
-        const querySnapshot = await getDocs(q);
-        const players: UserData[] = [];
-        querySnapshot.forEach((doc) => players.push(doc.data() as UserData));
-        
-        setAllPlayers(players);
+            // 2. Récupérer tous les joueurs triés par score
+            const q = query(collection(db, "users"), orderBy("score", "desc"));
+            const querySnapshot = await getDocs(q);
+            const players: UserData[] = [];
+            querySnapshot.forEach((doc) => players.push(doc.data() as UserData));
+            
+            setAllPlayers(players);
 
-        // 3. Calculer mon classement
-        const rank = players.findIndex(p => p.surnom === myData?.surnom) + 1;
-        setMyRank(rank);
+            // 3. Calculer mon classement
+            const rank = players.findIndex(p => p.surnom === myData?.surnom) + 1;
+            setMyRank(rank);
 
-        const configSnap = await getDoc(doc(db, "config", "next_episode"));
-        if (configSnap.exists()) {
-        setNextEpisodeData(configSnap.data() as ConfigData);
-        }
+            const configSnap = await getDoc(doc(db, "config", "next_episode"));
+            if (configSnap.exists()) {
+            setNextEpisodeData(configSnap.data() as ConfigData);
+            }
+
+            // 4. Récupérer la liste des Queens (pour le pronostic couronne)
+            const queensSnap = await getDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9"));
+            if (queensSnap.exists()) {
+            setQueens(queensSnap.data().queens || []);
+            }
         };
 
         fetchData();
@@ -115,10 +132,10 @@ export default function DashboardPage() {
                         <p className="text-purple-700 font-bold text-2xl">Épisode {nextEpisodeData?.numero}</p>
                         <div className="pt-4">
                             <p className="text-sm text-gray-500">Diffusion prévue le :</p>
-                            <p className="font-semibold text-gray-800">{nextEpisodeData?.date}</p>
+                            <p className="font-semibold text-gray-800">{formatDateDiffusion(nextEpisodeData?.dateDiffusion)}</p>
                         </div>
-                        <p className="text-sm text-purple-700 font-bold mt-2">Pronostics de l&apos;épisode {nextEpisodeData?.numero} jusqu&apos;au :</p>
-                        <p className="text-sm text-purple-700 font-bold mt-2">{nextEpisodeData?.dateLimite}</p>
+                        <p className="text-sm text-purple-700 font-bold mt-2">Pronostics de l&apos;épisode {nextEpisodeData?.numero} ouverts jusqu&apos;à la diffusion :</p>
+                        <p className="text-sm text-purple-700 font-bold mt-2">{formatDateDiffusion(nextEpisodeData?.dateDiffusion)}</p>
                     </div>
 
                     {/* Colonne Droite : Miniature */}
@@ -132,18 +149,29 @@ export default function DashboardPage() {
                     />
                     </div>
                 </div>
+
+                <button
+                onClick={() => router.push("/pronostics")}
+                className="bg-purple-600 text-white w-full py-4 rounded-xl font-bold mt-6"
+                >
+                Pronostiquer l&apos;épisode {nextEpisodeData?.numero}
+                </button>
             </section>
-            
+
             <div className="bg-white p-6 rounded shadow text-center rounded-xl">
-                <button 
-                onClick={() => router.push("/pronostics")} 
+                <button
+                onClick={() => setShowCrownModal(true)}
                 className="bg-purple-600 text-white w-full py-4 rounded font-bold text-gray-900"
                 >
-                Faire mes pronostics
+                👑 Pronostiquer la gagnante de la saison
                 </button>
             </div>
         </section>
       </div>
+
+      {showCrownModal && (
+        <CrownPredictionModal queens={queens} onClose={() => setShowCrownModal(false)} />
+      )}
     </main>
   );
 }

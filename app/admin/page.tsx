@@ -1,20 +1,29 @@
 "use client";
 import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, collection, getDocs, arrayUnion } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs, arrayUnion, Timestamp } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { UserData } from "@/types/user";
+import { CrownResultData } from "@/types/crown";
 import Header from "@/components/Header";
+
+const pad = (n: number) => String(n).padStart(2, "0");
+
+// Formate un Timestamp Firestore pour la valeur d'un <input type="datetime-local">
+const toDatetimeLocalValue = (timestamp: Timestamp) => {
+  const d = timestamp.toDate();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
 
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [episodeNum, setEpisodeNum] = useState(1);
   const [dateDiffusion, setDateDiffusion] = useState("");
-  const [dateLimite, setDateLimite] = useState("");
   const [queensList, setQueensList] = useState<string[]>([]);
   const [miniDefisList, setMiniDefisList] = useState<string[]>([]);
   const [maxiDefisList, setMaxiDefisList] = useState<string[]>([]);
+  const [crownWinner, setCrownWinner] = useState("");
 //   const [users, setUsers] = useState<any[]>([]);
 //   const [users, setUsers] = useState<[]>([]);
   const [users, setUsers] = useState<UserData[]>([]);
@@ -101,8 +110,8 @@ export default function AdminPage() {
         const configDoc = await getDoc(doc(db, "config", "next_episode"));
         if (configDoc.exists()) {
           setEpisodeNum(configDoc.data().numero);
-          setDateDiffusion(configDoc.data().date);
-          setDateLimite(configDoc.data().dateLimite);
+          const ts = configDoc.data().dateDiffusion as Timestamp | undefined;
+          if (ts) setDateDiffusion(toDatetimeLocalValue(ts));
         }
         
         // Charger la liste des joueurs
@@ -114,6 +123,11 @@ export default function AdminPage() {
           setQueensList(data.queens || []);
           setMiniDefisList(data.minidefis || []);
           setMaxiDefisList(data.maxidefis || []);
+        }
+
+        const crownResultDoc = await getDoc(doc(db, "config", "crown_result"));
+        if (crownResultDoc.exists()) {
+          setCrownWinner((crownResultDoc.data() as CrownResultData).winner);
         }
         // usersSnap.forEach(doc => usersList.push({ id: doc.id, ...doc.data() } as UserData));
         usersSnap.forEach((doc) => {
@@ -139,13 +153,27 @@ export default function AdminPage() {
     checkAdmin();
   }, [router]);
 
+  const handleSaveCrownWinner = async () => {
+    if (!crownWinner) return;
+
+    try {
+      await setDoc(doc(db, "config", "crown_result"), {
+        winner: crownWinner,
+        publishedAt: Timestamp.now(),
+      });
+      alert("Gagnante de la saison enregistrée !");
+    } catch (error) {
+      console.error("Erreur :", error);
+      alert("Erreur lors de la sauvegarde.");
+    }
+  };
+
   const handleUpdateEpisode = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await updateDoc(doc(db, "config", "next_episode"), {
         numero: episodeNum,
-        date: dateDiffusion,
-        dateLimite: dateLimite
+        dateDiffusion: Timestamp.fromDate(new Date(dateDiffusion))
       });
       alert("Épisode mis à jour !");
     } catch (err) {
@@ -181,23 +209,15 @@ export default function AdminPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Date de diffusion</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="datetime-local"
                     value={dateDiffusion}
                     onChange={(e) => setDateDiffusion(e.target.value)}
-                    placeholder="Ex: 20 Juin 2026"
                     className="w-full p-3 rounded-xl border border-gray-200 text-gray-900"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Date limite pronostics</label>
-                  <input 
-                      type="text" 
-                      value={dateLimite}
-                      onChange={(e) => setDateLimite(e.target.value)}
-                      placeholder="Ex: 19 Juin 2026"
-                      className="w-full p-3 rounded-xl border border-gray-200 text-gray-900"
-                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Les pronostics se ferment automatiquement à cette date/heure.
+                  </p>
                 </div>
                 <button type="submit" className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl hover:bg-purple-700 transition">
                   Mettre à jour
@@ -268,12 +288,35 @@ export default function AdminPage() {
                 id="maxiDefisArea"
                 placeholder="Un Maxi-Defi par ligne"
               />
-              <button 
+              <button
                 onClick={handleSaveMaxiDefis}
                 className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl"
               >
                 Sauvegarder la liste des Maxi-Defis
               </button>
+            </section>
+
+            <section className="bg-white/95 p-8 rounded-[15px] shadow-lg">
+              <h2 className="text-2xl font-bold text-gray-950 mb-4">👑 Gagnante de la saison</h2>
+              <select
+                value={crownWinner}
+                onChange={(e) => setCrownWinner(e.target.value)}
+                className="w-full p-3 rounded-xl border border-gray-200 text-gray-900 mb-4"
+              >
+                <option value="">-- Choisis une Queen --</option>
+                {queensList.map((queen) => (
+                  <option key={queen} value={queen}>{queen}</option>
+                ))}
+              </select>
+              <button
+                onClick={handleSaveCrownWinner}
+                className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl"
+              >
+                Sauvegarder la gagnante de la saison
+              </button>
+              <p className="text-xs text-gray-500 mt-2">
+                À renseigner une fois la saison terminée. Ce champ fait foi pour comparer aux pronostics couronne des joueurs.
+              </p>
             </section>
 
           </div>

@@ -1,5 +1,6 @@
+import { Timestamp } from "firebase/firestore";
+
 export interface ConfigData {
   numero: number;
-  date: string;
-  dateLimite: string;
+  dateDiffusion: Timestamp;
 }
