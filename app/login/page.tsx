@@ -1,70 +1,3 @@
-// "use client";
-// import { useState } from "react";
-// import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
-// import { auth, db } from "@/lib/firebase"; // Assure-toi d'importer db
-// import { doc, setDoc } from "firebase/firestore"; // Import nécessaire
-// import { useRouter } from "next/navigation";
-
-// export default function LoginPage() {
-//   const [email, setEmail] = useState("");
-//   const [password, setPassword] = useState("");
-//   const [surnom, setSurnom] = useState(""); // Nouvel état
-//   const [isRegistering, setIsRegistering] = useState(false);
-//   const router = useRouter();
-
-//   const handleSubmit = async (e: React.FormEvent) => {
-//     e.preventDefault();
-//     try {
-//       if (isRegistering) {
-//         // 1. Création du compte
-//         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-//         const user = userCredential.user;
-
-//         // 2. Enregistrement du surnom dans Firestore
-//         await setDoc(doc(db, "users", user.uid), {
-//             surnom: surnom,
-//             email: email,
-//             role: "user",
-//             score: 0,
-//             createdAt: new Date(),
-//             });
-//         alert("Compte créé avec succès !");
-//       } else {
-//         await signInWithEmailAndPassword(auth, email, password);
-//       }
-//       router.push("/dashboard");
-//     } catch (error: unknown) {
-//       if (error instanceof Error) alert("Erreur : " + error.message);
-//     }
-//   };
-
-//   return (
-//     <main 
-//       className="min-h-screen flex items-center justify-center bg-cover bg-center"
-//       style={{ backgroundImage: "url('/fond-login.png')" }}>
-//         <div className="flex flex-col items-center justify-center min-h-screen p-4">
-//         <h1 className="text-2xl font-bold mb-4">{isRegistering ? "Inscription" : "Connexion"}</h1>
-//         <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-full max-w-sm">
-//             <input type="email" placeholder="Email" className="border p-2 rounded" onChange={(e) => setEmail(e.target.value)} required />
-//             <input type="password" placeholder="Mot de passe" className="border p-2 rounded" onChange={(e) => setPassword(e.target.value)} required />
-            
-//             {/* Champ conditionnel pour le surnom */}
-//             {isRegistering && (
-//             <input type="text" placeholder="Ton surnom" className="border p-2 rounded" onChange={(e) => setSurnom(e.target.value)} required />
-//             )}
-            
-//             <button type="submit" className="bg-purple-600 text-white p-2 rounded">
-//             {isRegistering ? "S'inscrire" : "Se connecter"}
-//             </button>
-//         </form>
-//         <button onClick={() => setIsRegistering(!isRegistering)} className="mt-4 text-sm text-blue-500 underline">
-//             {isRegistering ? "Déjà un compte ? Connectez-vous" : "Pas de compte ? Inscrivez-vous"}
-//         </button>
-//         </div>
-//     </main>
-//   );
-// }
-
 "use client";
 import { useState } from "react";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
@@ -78,6 +11,7 @@ export default function LoginPage() {
   const [surnom, setSurnom] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -199,15 +133,35 @@ export default function LoginPage() {
             <label htmlFor="password" className="text-sm font-semibold text-gray-900">
               Mot de passe
             </label>
-            <input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-purple-300 focus:border-purple-500 transition text-gray-900"
-              required
-            />
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-200 focus:ring-2 focus:ring-purple-300 focus:border-purple-500 transition text-gray-900"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? "Masquer le mot de passe" : "Voir le mot de passe"}
+                className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 hover:text-gray-800 transition cursor-pointer"
+              >
+                {showPassword ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-5.05 0-9.29-3.14-11-7.5a12.14 12.14 0 0 1 3.06-4.44M9.9 4.24A10.9 10.9 0 0 1 12 4c5.05 0 9.29 3.14 11 7.5a12.16 12.16 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+                    <path d="M1 1l22 22" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                    <path d="M1 12s4-7.5 11-7.5S23 12 23 12s-4 7.5-11 7.5S1 12 1 12z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Bouton de validation (N'oublie pas d'avoir ajouté cursor: pointer dans global.css) */}
