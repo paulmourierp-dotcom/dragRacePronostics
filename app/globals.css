@@ -98,7 +98,7 @@ body {
 
   /* Le Header a ses propres boutons de nav discrets : pas d'effet "vrai bouton" ici */
   .app-header button,
-  .app-header [role="button"] {
+  .app-header [role="button"], #podium button {
     transition: none;
   }
 

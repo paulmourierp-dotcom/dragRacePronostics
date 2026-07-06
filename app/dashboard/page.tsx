@@ -140,7 +140,7 @@ export default function DashboardPage() {
       {/* Colonnes */}
       <div className="grid md:grid-cols-2 gap-6 p-6">
       {/* Colonne Gauche : Stats & Classement */}
-        <section className="space-y-6">
+        <section id="podium" className="space-y-6">
             <div className="bg-white p-6 rounded shadow border border-gray-200 rounded-xl">
             <h2 className="text-xl font-bold mb-4 text-gray-900">Tes Statistiques</h2>
             <p className="text-gray-800">Score total : {userData?.score || 0} points</p>
