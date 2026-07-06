@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
-import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { PredictionData } from "@/types/prediction";
 import { ResultData } from "@/types/result";
 import PredictionBreakdown from "@/components/PredictionBreakdown";
@@ -15,7 +15,7 @@ interface PlayerDetailsModalProps {
 
 interface EpisodeEntry {
   episodeId: number;
-  prediction: PredictionData;
+  prediction: PredictionData | null;
   result: ResultData;
 }
 
@@ -26,24 +26,26 @@ export default function PlayerDetailsModal({ uid, surnom, rank, onClose }: Playe
 
   useEffect(() => {
     const fetchData = async () => {
-      const predsSnap = await getDocs(
-        query(collection(db, "predictions"), where("userId", "==", uid))
-      );
-      const predictions = predsSnap.docs.map((d) => d.data() as PredictionData);
+      // On part de tous les épisodes déjà résultés (pas des pronostics du joueur) : un
+      // épisode scoré doit apparaître même si ce joueur n'a jamais pronostiqué dessus.
+      const [resultsSnap, predsSnap] = await Promise.all([
+        getDocs(collection(db, "results")),
+        getDocs(query(collection(db, "predictions"), where("userId", "==", uid))),
+      ]);
 
-      const results = await Promise.all(
-        predictions.map((p) => getDoc(doc(db, "results", String(p.episodeId))))
-      );
+      const predictionByEpisode = new Map<number, PredictionData>();
+      predsSnap.docs.forEach((d) => {
+        const prediction = d.data() as PredictionData;
+        predictionByEpisode.set(prediction.episodeId, prediction);
+      });
 
-      // Un autre joueur ne doit jamais voir un pronostic tant que le résultat officiel
-      // n'a pas été publié pour cet épisode, peu importe où en est next_episode.numero.
-      const scoredEntries = predictions
-        .map((prediction, i) => ({
-          episodeId: prediction.episodeId,
-          prediction,
-          result: results[i].exists() ? (results[i].data() as ResultData) : null,
+      const scoredEntries = resultsSnap.docs
+        .map((d) => d.data() as ResultData)
+        .map((result) => ({
+          episodeId: result.numero,
+          prediction: predictionByEpisode.get(result.numero) ?? null,
+          result,
         }))
-        .filter((e): e is EpisodeEntry => e.result !== null)
         .sort((a, b) => b.episodeId - a.episodeId);
 
       setEntries(scoredEntries);
@@ -64,7 +66,7 @@ export default function PlayerDetailsModal({ uid, surnom, rank, onClose }: Playe
         {loading ? (
           <p className="text-gray-500">Chargement...</p>
         ) : entries.length === 0 ? (
-          <p className="text-gray-500">Aucun pronostic pour le moment.</p>
+          <p className="text-gray-500">Aucun épisode résulté pour le moment.</p>
         ) : (
           <div className="space-y-2">
             {entries.map(({ episodeId, prediction, result }) => {
@@ -76,11 +78,17 @@ export default function PlayerDetailsModal({ uid, surnom, rank, onClose }: Playe
                     className="w-full flex justify-between items-center px-4 py-3 bg-gray-50 text-left"
                   >
                     <span className="font-bold text-gray-900">Épisode {episodeId}</span>
-                    <span className="font-bold text-purple-700">{prediction.pointsEarned ?? 0} pts</span>
+                    <span className="font-bold text-purple-700">{prediction?.pointsEarned ?? 0} pts</span>
                   </button>
                   {isOpen && (
                     <div className="p-4">
-                      <PredictionBreakdown prediction={prediction} result={result} />
+                      {prediction ? (
+                        <PredictionBreakdown prediction={prediction} result={result} />
+                      ) : (
+                        <p className="text-sm text-gray-500">
+                          Ce joueur n&apos;a pas effectué de pronostic dans le temps imparti.
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>

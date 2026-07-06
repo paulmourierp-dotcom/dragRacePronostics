@@ -24,6 +24,7 @@ import { normalizeQueens } from "@/lib/queens";
 import { SCORING_RULES } from "@/lib/scoring";
 import Header from "@/components/Header";
 import QueensSelectTable, { QueenChoice } from "@/components/QueensSelectTable";
+import NextEpisodeModal from "@/components/NextEpisodeModal";
 import { useToast } from "@/contexts/ToastContext";
 
 interface UserRow extends UserData {
@@ -33,11 +34,14 @@ interface UserRow extends UserData {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
+// Formate une Date pour la valeur d'un <input type="datetime-local">
+const formatDatetimeLocal = (d: Date) =>
+  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
 // Formate un Timestamp Firestore pour la valeur d'un <input type="datetime-local">
-const toDatetimeLocalValue = (timestamp: Timestamp) => {
-  const d = timestamp.toDate();
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
+const toDatetimeLocalValue = (timestamp: Timestamp) => formatDatetimeLocal(timestamp.toDate());
+
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 const computeEpisodePoints = (
   prediction: PredictionData,
@@ -117,12 +121,19 @@ export default function AdminPage() {
   const [savingResults, setSavingResults] = useState(false);
   const showToast = useToast();
   const [resultsHistory, setResultsHistory] = useState<ResultData[]>([]);
+  // Épisode actuellement affiché/modifié dans la section "Résultats de l'épisode" : peut différer
+  // de `episodeNum` (l'épisode en cours dans "Prochain Épisode") quand on corrige un épisode passé.
+  const [resultsEpisodeNum, setResultsEpisodeNum] = useState(1);
+  const [showNextEpisodeModal, setShowNextEpisodeModal] = useState(false);
+  const [nextEpisodeDraftNum, setNextEpisodeDraftNum] = useState(1);
+  const [nextEpisodeDraftDate, setNextEpisodeDraftDate] = useState("");
   const router = useRouter();
 
   // Recharge le formulaire "Résultats de l'épisode" pour un numéro donné : reprend les
   // résultats déjà saisis s'ils existent (édition), sinon repart d'un formulaire vierge
   // (nouvel épisode : aucune Queen ni barème hérité de l'épisode précédent).
   const loadResultsForEpisode = async (numero: number) => {
+    setResultsEpisodeNum(numero);
     const resultDoc = await getDoc(doc(db, "results", String(numero)));
     if (resultDoc.exists()) {
       const data = resultDoc.data() as ResultData;
@@ -347,11 +358,17 @@ export default function AdminPage() {
     }
   };
 
-  // La Queen éliminée pour l'épisode en cours d'édition doit rester visible dans ce tableau
-  // même après l'enregistrement (qui la marque déjà "eliminee" dans la Gestion des Queens),
-  // pour pouvoir encore corriger les résultats tant qu'on n'est pas passé à l'épisode suivant.
+  // Le tableau de résultats d'un épisode doit refléter le roster tel qu'il était à CE moment-là,
+  // pas le statut global "eliminee" actuel : une Queen éliminée plus tard (ou dans cet épisode
+  // même) était encore active à l'époque. On s'appuie sur l'historique des résultats déjà publiés
+  // pour le savoir, ce qui permet de rouvrir et corriger n'importe quel épisode passé.
   const resultsActiveQueens = queensList
-    .filter((q) => !q.eliminee || q.name === resultsEliminee)
+    .filter((q) => {
+      if (!q.eliminee) return true;
+      if (q.name === resultsEliminee) return true;
+      const eliminatedAtEpisode = resultsHistory.find((r) => r.eliminee === q.name)?.numero;
+      return eliminatedAtEpisode !== undefined && eliminatedAtEpisode >= resultsEpisodeNum;
+    })
     .map((q) => q.name);
   const resultsTopQueens = resultsActiveQueens.filter((q) => resultsQueensStatus[q] === "top");
   const resultsBottomQueens = resultsActiveQueens.filter((q) => resultsQueensStatus[q] === "bottom");
@@ -376,10 +393,12 @@ export default function AdminPage() {
       return;
     }
 
+    const isEditingPastEpisode = resultsEpisodeNum !== episodeNum;
+
     setSavingResults(true);
     try {
       const resultData: ResultData = {
-        numero: episodeNum,
+        numero: resultsEpisodeNum,
         top: [resultsTopQueens[0], resultsTopQueens[1]],
         bottom: [resultsBottomQueens[0], resultsBottomQueens[1]],
         eliminee: resultsEliminee,
@@ -390,16 +409,23 @@ export default function AdminPage() {
         publishedAt: Timestamp.now(),
       };
 
-      const updatedQueensList = queensList.map((q) =>
-        q.name === resultsEliminee ? { ...q, eliminee: true } : q
-      );
+      // Repart de zéro pour cet épisode : si on corrige une erreur (l'éliminée a changé),
+      // l'ancienne éliminée de CET épisode doit être "réhabilitée", sans toucher aux autres.
+      const previousResultForEpisode = resultsHistory.find((r) => r.numero === resultsEpisodeNum);
+      const updatedQueensList = queensList.map((q) => {
+        if (q.name === resultsEliminee) return { ...q, eliminee: true };
+        if (previousResultForEpisode && q.name === previousResultForEpisode.eliminee) {
+          return { ...q, eliminee: false };
+        }
+        return q;
+      });
 
       const batch = writeBatch(db);
-      batch.set(doc(db, "results", String(episodeNum)), resultData);
+      batch.set(doc(db, "results", String(resultsEpisodeNum)), resultData);
       batch.update(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9"), { queens: updatedQueensList });
 
       const predsSnap = await getDocs(
-        query(collection(db, "predictions"), where("episodeId", "==", episodeNum))
+        query(collection(db, "predictions"), where("episodeId", "==", resultsEpisodeNum))
       );
       const affectedUserIds = new Set<string>();
       predsSnap.forEach((predDoc) => {
@@ -411,9 +437,10 @@ export default function AdminPage() {
 
       await batch.commit();
       setQueensList(updatedQueensList);
-      setResultsHistory((prev) => [resultData, ...prev.filter((r) => r.numero !== episodeNum)]);
+      setResultsHistory((prev) => [resultData, ...prev.filter((r) => r.numero !== resultsEpisodeNum)]);
 
-      // Recalcule le score total de chaque joueur concerné
+      // Recalcule le score total de chaque joueur concerné (couvre aussi bien un nouvel
+      // épisode qu'une correction d'un épisode passé : l'erreur est humaine, ça peut arriver).
       const newScores: Record<string, number> = {};
       for (const uid of affectedUserIds) {
         newScores[uid] = await recomputeUserScore(uid);
@@ -421,12 +448,49 @@ export default function AdminPage() {
 
       setUsers((prev) => prev.map((u) => (u.uid in newScores ? { ...u, score: newScores[u.uid] } : u)));
 
-      showToast("Résultats enregistrés et scores calculés !", "success");
+      showToast(
+        isEditingPastEpisode
+          ? `Résultats de l'épisode ${resultsEpisodeNum} corrigés, scores recalculés !`
+          : "Résultats enregistrés et scores calculés !",
+        "success"
+      );
+
+      // Après avoir résulté l'épisode en cours (pas une correction passée), on propose
+      // d'enchaîner sur le prochain épisode. Toujours modifiable ensuite manuellement.
+      if (!isEditingPastEpisode) {
+        const draftDate = dateDiffusion
+          ? formatDatetimeLocal(new Date(new Date(dateDiffusion).getTime() + SEVEN_DAYS_MS))
+          : "";
+        setNextEpisodeDraftNum(resultsEpisodeNum + 1);
+        setNextEpisodeDraftDate(draftDate);
+        setShowNextEpisodeModal(true);
+      }
     } catch (error) {
       console.error("Erreur :", error);
       showToast("Erreur lors de l'enregistrement des résultats.", "error");
     } finally {
       setSavingResults(false);
+    }
+  };
+
+  const handleEditHistoricalResult = (numero: number) => {
+    loadResultsForEpisode(numero);
+  };
+
+  const handleConfirmNextEpisode = async (numero: number, date: string) => {
+    try {
+      await updateDoc(doc(db, "config", "next_episode"), {
+        numero,
+        dateDiffusion: Timestamp.fromDate(new Date(date)),
+      });
+      setEpisodeNum(numero);
+      setDateDiffusion(date);
+      await loadResultsForEpisode(numero);
+      setShowNextEpisodeModal(false);
+      showToast("Prochain épisode enregistré !", "success");
+    } catch (error) {
+      console.error("Erreur :", error);
+      showToast("Erreur lors de la mise à jour du prochain épisode.", "error");
     }
   };
 
@@ -640,11 +704,25 @@ export default function AdminPage() {
             </section>
 
             <section className="bg-white/95 p-8 rounded-[15px] shadow-lg md:col-span-2">
-              <h2 className="text-2xl font-bold text-gray-950 mb-2">Résultats de l&apos;épisode {episodeNum}</h2>
+              <div className="flex justify-between items-center mb-2">
+                <h2 className="text-2xl font-bold text-gray-950">Résultats de l&apos;épisode {resultsEpisodeNum}</h2>
+                {resultsEpisodeNum !== episodeNum && (
+                  <button
+                    onClick={() => loadResultsForEpisode(episodeNum)}
+                    className="text-sm px-3 py-1 rounded border border-gray-200 text-gray-700 font-semibold"
+                  >
+                    Revenir à l&apos;épisode en cours ({episodeNum})
+                  </button>
+                )}
+              </div>
               <p className="text-xs text-gray-500 mb-4">
-                Reprend le même tableau que celui rempli par les joueurs. À l&apos;enregistrement, la Queen éliminée
-                est automatiquement marquée comme telle dans la Gestion des Queens, et les scores de tous les
-                joueurs ayant pronostiqué cet épisode sont recalculés.
+                {resultsEpisodeNum !== episodeNum ? (
+                  <>Modification d&apos;un résultat déjà publié : les scores des joueurs concernés seront recalculés.</>
+                ) : (
+                  <>Reprend le même tableau que celui rempli par les joueurs. À l&apos;enregistrement, la Queen éliminée
+                  est automatiquement marquée comme telle dans la Gestion des Queens, et les scores de tous les
+                  joueurs ayant pronostiqué cet épisode sont recalculés.</>
+                )}
               </p>
 
               <QueensSelectTable
@@ -754,8 +832,8 @@ export default function AdminPage() {
             <section className="bg-white/95 p-8 rounded-[15px] shadow-lg md:col-span-2">
               <h2 className="text-2xl font-bold text-gray-950 mb-2">Historique des résultats</h2>
               <p className="text-xs text-gray-500 mb-4">
-                Résultats déjà publiés pour les épisodes précédents. Non modifiables : passe par la
-                section ci-dessus tant que l&apos;épisode est encore l&apos;épisode en cours.
+                Résultats déjà publiés pour les épisodes précédents. Clique sur Modifier pour corriger
+                une erreur : les scores des joueurs concernés sont automatiquement recalculés.
               </p>
 
               {resultsHistory.filter((r) => r.numero < episodeNum).length === 0 ? (
@@ -771,7 +849,8 @@ export default function AdminPage() {
                         <th className="py-2 pr-4 text-gray-500 font-bold uppercase text-xs">Gagnante</th>
                         <th className="py-2 pr-4 text-gray-500 font-bold uppercase text-xs">Éliminée</th>
                         <th className="py-2 pr-4 text-gray-500 font-bold uppercase text-xs">Mini-Défi</th>
-                        <th className="py-2 text-gray-500 font-bold uppercase text-xs">Maxi-Défi</th>
+                        <th className="py-2 pr-4 text-gray-500 font-bold uppercase text-xs">Maxi-Défi</th>
+                        <th className="py-2 text-gray-500 font-bold uppercase text-xs"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -785,7 +864,15 @@ export default function AdminPage() {
                             <td className="py-3 pr-4 text-gray-900">{r.winner}</td>
                             <td className="py-3 pr-4 text-gray-900">{r.eliminee}</td>
                             <td className="py-3 pr-4 text-gray-900">{r.miniDefi}</td>
-                            <td className="py-3 text-gray-900">{r.maxiDefi}</td>
+                            <td className="py-3 pr-4 text-gray-900">{r.maxiDefi}</td>
+                            <td className="py-3 text-right">
+                              <button
+                                onClick={() => handleEditHistoricalResult(r.numero)}
+                                className="text-sm px-3 py-1 rounded border border-gray-200 text-gray-700 font-semibold"
+                              >
+                                Modifier
+                              </button>
+                            </td>
                           </tr>
                         ))}
                     </tbody>
@@ -797,6 +884,15 @@ export default function AdminPage() {
           </div>
         </div>
       </div>
+
+      {showNextEpisodeModal && (
+        <NextEpisodeModal
+          defaultNumero={nextEpisodeDraftNum}
+          defaultDate={nextEpisodeDraftDate}
+          onConfirm={handleConfirmNextEpisode}
+          onClose={() => setShowNextEpisodeModal(false)}
+        />
+      )}
     </>
   );
 }
