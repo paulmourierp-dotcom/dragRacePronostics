@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import AuthGuard from "@/components/AuthGuard";
 import Header from "@/components/Header";
 import EpisodeResultModal from "@/components/EpisodeResultModal";
+import PredictionBreakdown from "@/components/PredictionBreakdown";
 import { auth, db } from "@/lib/firebase";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { UserData } from "@/types/user";
@@ -14,30 +15,6 @@ interface HistoryEntry {
   episodeId: number;
   prediction: PredictionData;
   result: ResultData | null;
-}
-
-// null = pas encore de résultat officiel (aucun avis à donner)
-function Chip({ label, correct }: { label: string; correct: boolean | null }) {
-  const style =
-    correct === null
-      ? "bg-gray-100 text-gray-600 border-gray-200"
-      : correct
-      ? "bg-green-100 text-green-800 border-green-300"
-      : "bg-red-100 text-red-800 border-red-300";
-  return (
-    <span className={`text-sm font-semibold px-2 py-1 rounded border ${style}`}>
-      {label}
-    </span>
-  );
-}
-
-function GuessRow({ label, guess, correct }: { label: string; guess: string | null; correct: boolean | null }) {
-  return (
-    <div>
-      <p className="text-sm font-bold text-gray-700 mb-1">{label}</p>
-      {guess ? <Chip label={guess} correct={correct} /> : <span className="text-sm text-gray-400">—</span>}
-    </div>
-  );
 }
 
 export default function HistoriquePage() {
@@ -89,16 +66,6 @@ export default function HistoriquePage() {
     fetchData();
   }, []);
 
-  const topGuesses = (prediction: PredictionData) =>
-    Object.entries(prediction.queensResults)
-      .filter(([, v]) => v === "top")
-      .map(([queen]) => queen);
-
-  const bottomGuesses = (prediction: PredictionData) =>
-    Object.entries(prediction.queensResults)
-      .filter(([, v]) => v === "bottom")
-      .map(([queen]) => queen);
-
   const renderEntry = ({ episodeId, prediction, result }: HistoryEntry) => (
     <div key={episodeId} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
       <div className="flex justify-between items-center mb-4">
@@ -121,66 +88,7 @@ export default function HistoriquePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <div>
-          <p className="text-sm font-bold text-gray-700 mb-1">Top pronostiqué</p>
-          <div className="flex flex-wrap gap-2">
-            {topGuesses(prediction).length === 0 ? (
-              <span className="text-sm text-gray-400">—</span>
-            ) : (
-              topGuesses(prediction).map((queen) => (
-                <Chip
-                  key={queen}
-                  label={queen}
-                  correct={result ? result.top.includes(queen) : null}
-                />
-              ))
-            )}
-          </div>
-        </div>
-        <div>
-          <p className="text-sm font-bold text-gray-700 mb-1">Bottom pronostiqué</p>
-          <div className="flex flex-wrap gap-2">
-            {bottomGuesses(prediction).length === 0 ? (
-              <span className="text-sm text-gray-400">—</span>
-            ) : (
-              bottomGuesses(prediction).map((queen) => (
-                <Chip
-                  key={queen}
-                  label={queen}
-                  correct={result ? result.bottom.includes(queen) : null}
-                />
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <GuessRow
-          label="Gagnante"
-          guess={prediction.winner}
-          correct={result ? prediction.winner === result.winner : null}
-        />
-        <GuessRow
-          label="Éliminée"
-          guess={prediction.eliminee}
-          correct={result ? prediction.eliminee === result.eliminee : null}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <GuessRow
-          label="Mini-Défi"
-          guess={prediction.miniDefi}
-          correct={result ? prediction.miniDefi === result.miniDefi : null}
-        />
-        <GuessRow
-          label="Maxi-Défi"
-          guess={prediction.maxiDefi}
-          correct={result ? prediction.maxiDefi === result.maxiDefi : null}
-        />
-      </div>
+      <PredictionBreakdown prediction={prediction} result={result} />
     </div>
   );
 

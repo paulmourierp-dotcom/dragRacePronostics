@@ -31,9 +31,10 @@ const ReglesPage = () => {
     }, []);
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="p-6 max-w-5xl mx-auto">
-      <Header isAdmin={userData?.role === "admin"} />
+    <AuthGuard>
+      <main className="bg-gray-50">
+        <Header isAdmin={userData?.role === "admin"} />
+        <div className="p-6 max-w-5xl mx-auto">
         <h1 className="text-4xl font-extrabold text-gray-950 mb-8">Règles du Jeu</h1>
         
         <div className="bg-white p-8 rounded-[20px] shadow-sm border border-gray-100 space-y-8">

@@ -11,6 +11,7 @@ import { normalizeQueens } from "@/lib/queens";
 import Image from 'next/image';
 import Header from "@/components/Header";
 import CrownPredictionModal from "@/components/CrownPredictionModal";
+import PlayerDetailsModal from "@/components/PlayerDetailsModal";
 
 const formatDateDiffusion = (timestamp?: Timestamp) =>
   timestamp
@@ -20,11 +21,33 @@ const formatDateDiffusion = (timestamp?: Timestamp) =>
       })
     : "";
 
+interface PlayerRow extends UserData {
+  uid: string;
+}
+
+// Classement standard (ex-aequo) : deux scores égaux partagent le même rang,
+// et le rang suivant saute d'autant (1, 2, 2, 4...). `players` doit déjà être trié par score desc.
+const computeRanks = (players: { score?: number }[]): number[] => {
+  const ranks: number[] = [];
+  let lastScore: number | null = null;
+  let lastRank = 0;
+  players.forEach((p, i) => {
+    const score = p.score ?? 0;
+    if (lastScore === null || score !== lastScore) {
+      lastRank = i + 1;
+      lastScore = score;
+    }
+    ranks.push(lastRank);
+  });
+  return ranks;
+};
+
 export default function DashboardPage() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const router = useRouter();
-  const [allPlayers, setAllPlayers] = useState<UserData[]>([]);
+  const [allPlayers, setAllPlayers] = useState<PlayerRow[]>([]);
   const [myRank, setMyRank] = useState<number>(0);
+  const [selectedPlayer, setSelectedPlayer] = useState<(PlayerRow & { rank: number }) | null>(null);
   const [nextEpisodeData, setNextEpisodeData] = useState<ConfigData | null>(null);
   const [queens, setQueens] = useState<string[]>([]);
   const [crownLocked, setCrownLocked] = useState(false);
@@ -49,14 +72,15 @@ export default function DashboardPage() {
             // 2. Récupérer tous les joueurs triés par score
             const q = query(collection(db, "users"), orderBy("score", "desc"));
             const querySnapshot = await getDocs(q);
-            const players: UserData[] = [];
-            querySnapshot.forEach((doc) => players.push(doc.data() as UserData));
-            
+            const players: PlayerRow[] = [];
+            querySnapshot.forEach((playerDoc) => players.push({ ...(playerDoc.data() as UserData), uid: playerDoc.id }));
+
             setAllPlayers(players);
 
-            // 3. Calculer mon classement
-            const rank = players.findIndex(p => p.surnom === myData?.surnom) + 1;
-            setMyRank(rank);
+            // 3. Calculer mon classement (gère les ex-aequo)
+            const ranks = computeRanks(players);
+            const myIndex = players.findIndex(p => p.uid === user.uid);
+            setMyRank(myIndex === -1 ? 0 : ranks[myIndex]);
 
             const configSnap = await getDoc(doc(db, "config", "next_episode"));
             if (configSnap.exists()) {
@@ -82,6 +106,10 @@ export default function DashboardPage() {
         fetchData();
     }, []);
 
+  const ranks = computeRanks(allPlayers);
+  const rankedPlayers = allPlayers.map((player, i) => ({ ...player, rank: ranks[i] }));
+  const isTied = (rank: number) => ranks.filter((r) => r === rank).length > 1;
+
   return (
     <main className="min-h-screen bg-gray-50">
       <Header isAdmin={userData?.role === "admin"} />
@@ -103,26 +131,37 @@ export default function DashboardPage() {
             <div className="bg-white p-6 rounded shadow border border-gray-200 rounded-xl">
             <h2 className="text-xl font-bold mb-4 text-gray-900">Podium</h2>
             <div className="flex justify-around items-end mb-8">
-                {allPlayers.slice(0, 3).map((player, index) => (
-                <div key={index} className="text-center flex flex-col items-center">
-                    {/* Ajout de la couronne pour le premier (index 0) */}
-                    {index === 0 && <span className="text-3xl mb-1">👑</span>}
-                    <div className="font-bold text-lg">{player.surnom}</div>
+                {rankedPlayers.slice(0, 3).map((player) => (
+                <div key={player.uid} className="text-center flex flex-col items-center">
+                    {/* Ajout de la couronne pour le(s) 1er(s), même en cas d'ex-aequo */}
+                    {player.rank === 1 && <span className="text-3xl mb-1">👑</span>}
+                    <button
+                      onClick={() => setSelectedPlayer(player)}
+                      className="font-bold text-lg hover:underline"
+                    >
+                      {player.surnom}
+                    </button>
                     <div className="bg-purple-600 text-white px-4 py-2 rounded mt-1">
                     {(player.score ?? 0) > 0 ? `${player.score} pts` : "0 pts"}
                     </div>
-                    <div className="text-xs text-gray-500 mt-2">{index + 1}e place</div>
+                    <div className="text-xs text-gray-500 mt-2">
+                      {player.rank}e place{isTied(player.rank) ? " (ex æquo)" : ""}
+                    </div>
                 </div>
                 ))}
             </div>
 
             {/* Liste des autres avec classement */}
             <ul className="divide-y divide-gray-100">
-                {allPlayers.slice(3).map((player, index) => (
-                <li key={index + 3} className="py-2 flex justify-between">
+                {rankedPlayers.slice(3).map((player) => (
+                <li key={player.uid} className="py-2 flex justify-between">
                     <span className="font-medium">
-                    <span className="text-gray-400 mr-3">{index + 4}e</span> 
-                    {player.surnom}
+                    <span className="text-gray-400 mr-3">
+                      {player.rank}e{isTied(player.rank) ? " (ex æquo)" : ""}
+                    </span>
+                    <button onClick={() => setSelectedPlayer(player)} className="hover:underline">
+                      {player.surnom}
+                    </button>
                     </span>
                     <span className="font-bold">
                     {(player.score ?? 0) > 0 ? `${player.score} pts` : "0 pts"}
@@ -187,6 +226,15 @@ export default function DashboardPage() {
           queens={queens}
           locked={crownLocked}
           onClose={() => setShowCrownModal(false)}
+        />
+      )}
+
+      {selectedPlayer && (
+        <PlayerDetailsModal
+          uid={selectedPlayer.uid}
+          surnom={selectedPlayer.surnom}
+          rank={selectedPlayer.rank}
+          onClose={() => setSelectedPlayer(null)}
         />
       )}
     </main>
