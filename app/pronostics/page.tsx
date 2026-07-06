@@ -183,6 +183,7 @@ export default function PronosticPage() {
                   {miniDefisOptions.map((option) => (
                     <option key={option} value={option}>{option}</option>
                   ))}
+                  <option value="Autre">Autre</option>
                 </select>
               </div>
               <div>
@@ -196,6 +197,7 @@ export default function PronosticPage() {
                   {maxiDefisOptions.map((option) => (
                     <option key={option} value={option}>{option}</option>
                   ))}
+                  <option value="Autre">Autre</option>
                 </select>
               </div>
             </div>
