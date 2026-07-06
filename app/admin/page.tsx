@@ -347,7 +347,12 @@ export default function AdminPage() {
     }
   };
 
-  const resultsActiveQueens = queensList.filter((q) => !q.eliminee).map((q) => q.name);
+  // La Queen éliminée pour l'épisode en cours d'édition doit rester visible dans ce tableau
+  // même après l'enregistrement (qui la marque déjà "eliminee" dans la Gestion des Queens),
+  // pour pouvoir encore corriger les résultats tant qu'on n'est pas passé à l'épisode suivant.
+  const resultsActiveQueens = queensList
+    .filter((q) => !q.eliminee || q.name === resultsEliminee)
+    .map((q) => q.name);
   const resultsTopQueens = resultsActiveQueens.filter((q) => resultsQueensStatus[q] === "top");
   const resultsBottomQueens = resultsActiveQueens.filter((q) => resultsQueensStatus[q] === "bottom");
   const resultsAllSelected = resultsTopQueens.length === 2 && resultsBottomQueens.length === 2;
