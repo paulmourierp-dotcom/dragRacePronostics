@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import EpisodeResultModal from "@/components/EpisodeResultModal";
 import PredictionBreakdown from "@/components/PredictionBreakdown";
 import { auth, db } from "@/lib/firebase";
-import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where, Timestamp } from "firebase/firestore";
 import { UserData } from "@/types/user";
 import { ConfigData } from "@/types/config";
 import { PredictionData } from "@/types/prediction";
@@ -17,11 +17,20 @@ interface HistoryEntry {
   result: ResultData | null;
 }
 
+const formatDateDiffusion = (timestamp?: Timestamp) =>
+  timestamp
+    ? timestamp.toDate().toLocaleString("fr-FR", {
+        dateStyle: "long",
+        timeStyle: "short",
+      })
+    : "";
+
 export default function HistoriquePage() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalResult, setModalResult] = useState<ResultData | null>(null);
+  const [nextEpisode, setNextEpisode] = useState<ConfigData | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -36,9 +45,8 @@ export default function HistoriquePage() {
       const myData = userDoc.data();
       setUserData(myData ? (myData as UserData) : null);
 
-      const nextEpisodeNumero = nextEpisodeSnap.exists()
-        ? (nextEpisodeSnap.data() as ConfigData).numero
-        : null;
+      const nextEpisodeConfig = nextEpisodeSnap.exists() ? (nextEpisodeSnap.data() as ConfigData) : null;
+      setNextEpisode(nextEpisodeConfig);
 
       const predsSnap = await getDocs(
         query(collection(db, "predictions"), where("userId", "==", user.uid))
@@ -55,10 +63,6 @@ export default function HistoriquePage() {
           prediction,
           result: results[i].exists() ? (results[i].data() as ResultData) : null,
         }))
-        // Le pronostic de l'épisode encore ouvert (pas de résultat officiel publié) reste
-        // exclusivement sur /pronostics. Dès qu'un résultat est publié pour cet épisode, on
-        // l'affiche ici même si l'admin n'a pas encore avancé next_episode.numero.
-        .filter((e) => !(e.episodeId === nextEpisodeNumero && e.result === null))
         .sort((a, b) => b.episodeId - a.episodeId);
 
       setEntries(visibleEntries);
@@ -69,7 +73,10 @@ export default function HistoriquePage() {
     fetchData();
   }, []);
 
-  const renderEntry = ({ episodeId, prediction, result }: HistoryEntry) => (
+  const renderEntry = ({ episodeId, prediction, result }: HistoryEntry) => {
+    const isStillOpen = !result && episodeId === nextEpisode?.numero;
+
+    return (
     <div key={episodeId} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold text-gray-900">Épisode {episodeId}</h2>
@@ -77,6 +84,10 @@ export default function HistoriquePage() {
           {result ? (
             <span className="font-bold text-purple-700">
               {prediction.pointsEarned ?? 0} pts
+            </span>
+          ) : isStillOpen ? (
+            <span className="text-sm text-gray-500">
+              Ce pronostic sera bloqué à partir du {formatDateDiffusion(nextEpisode?.dateDiffusion)}
             </span>
           ) : (
             <span className="text-sm text-gray-500">En attente des résultats</span>
@@ -93,7 +104,8 @@ export default function HistoriquePage() {
 
       <PredictionBreakdown prediction={prediction} result={result} />
     </div>
-  );
+    );
+  };
 
   const inProgress = entries.filter((e) => e.result === null);
   const finished = entries.filter((e) => e.result !== null);

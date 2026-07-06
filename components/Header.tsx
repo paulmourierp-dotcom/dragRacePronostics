@@ -16,7 +16,7 @@ export default function Header({ isAdmin }: HeaderProps) {
   const isRegles = pathname === "/regles";
 
   return (
-    <header className="flex justify-between items-center p-4 bg-white shadow-sm">
+    <header className="app-header flex justify-between items-center p-4 bg-white shadow-sm">
       <img
         src="/logo.png"
         alt="Logo"

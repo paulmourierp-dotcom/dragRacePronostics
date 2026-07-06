@@ -95,4 +95,19 @@ body {
   button:disabled {
     cursor: not-allowed;
   }
+
+  /* Le Header a ses propres boutons de nav discrets : pas d'effet "vrai bouton" ici */
+  .app-header button,
+  .app-header [role="button"] {
+    transition: none;
+  }
+
+  .app-header button:hover,
+  .app-header button:active,
+  .app-header [role="button"]:hover,
+  .app-header [role="button"]:active {
+    transform: none !important;
+    box-shadow: none !important;
+    filter: none !important;
+  }
 }
