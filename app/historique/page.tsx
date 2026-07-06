@@ -99,6 +99,94 @@ export default function HistoriquePage() {
       .filter(([, v]) => v === "bottom")
       .map(([queen]) => queen);
 
+  const renderEntry = ({ episodeId, prediction, result }: HistoryEntry) => (
+    <div key={episodeId} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold text-gray-900">Épisode {episodeId}</h2>
+        <div className="flex items-center gap-3">
+          {result ? (
+            <span className="font-bold text-purple-700">
+              {prediction.pointsEarned ?? 0} pts
+            </span>
+          ) : (
+            <span className="text-sm text-gray-500">En attente des résultats</span>
+          )}
+          <button
+            onClick={() => result && setModalResult(result)}
+            disabled={!result}
+            className="text-sm px-3 py-1 rounded border border-gray-200 text-gray-700 font-semibold disabled:opacity-40"
+          >
+            Voir les résultats
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div>
+          <p className="text-sm font-bold text-gray-700 mb-1">Top pronostiqué</p>
+          <div className="flex flex-wrap gap-2">
+            {topGuesses(prediction).length === 0 ? (
+              <span className="text-sm text-gray-400">—</span>
+            ) : (
+              topGuesses(prediction).map((queen) => (
+                <Chip
+                  key={queen}
+                  label={queen}
+                  correct={result ? result.top.includes(queen) : null}
+                />
+              ))
+            )}
+          </div>
+        </div>
+        <div>
+          <p className="text-sm font-bold text-gray-700 mb-1">Bottom pronostiqué</p>
+          <div className="flex flex-wrap gap-2">
+            {bottomGuesses(prediction).length === 0 ? (
+              <span className="text-sm text-gray-400">—</span>
+            ) : (
+              bottomGuesses(prediction).map((queen) => (
+                <Chip
+                  key={queen}
+                  label={queen}
+                  correct={result ? result.bottom.includes(queen) : null}
+                />
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <GuessRow
+          label="Gagnante"
+          guess={prediction.winner}
+          correct={result ? prediction.winner === result.winner : null}
+        />
+        <GuessRow
+          label="Éliminée"
+          guess={prediction.eliminee}
+          correct={result ? prediction.eliminee === result.eliminee : null}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <GuessRow
+          label="Mini-Défi"
+          guess={prediction.miniDefi}
+          correct={result ? prediction.miniDefi === result.miniDefi : null}
+        />
+        <GuessRow
+          label="Maxi-Défi"
+          guess={prediction.maxiDefi}
+          correct={result ? prediction.maxiDefi === result.maxiDefi : null}
+        />
+      </div>
+    </div>
+  );
+
+  const inProgress = entries.filter((e) => e.result === null);
+  const finished = entries.filter((e) => e.result !== null);
+
   return (
     <AuthGuard>
       <main className="min-h-screen bg-gray-50">
@@ -114,91 +202,28 @@ export default function HistoriquePage() {
               Aucun pronostic dans l&apos;historique pour le moment.
             </div>
           ) : (
-            <div className="space-y-6">
-              {entries.map(({ episodeId, prediction, result }) => (
-                <div key={episodeId} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold text-gray-900">Épisode {episodeId}</h2>
-                    <div className="flex items-center gap-3">
-                      {result ? (
-                        <span className="font-bold text-purple-700">
-                          {prediction.pointsEarned ?? 0} pts
-                        </span>
-                      ) : (
-                        <span className="text-sm text-gray-500">En attente des résultats</span>
-                      )}
-                      <button
-                        onClick={() => result && setModalResult(result)}
-                        disabled={!result}
-                        className="text-sm px-3 py-1 rounded border border-gray-200 text-gray-700 font-semibold disabled:opacity-40"
-                      >
-                        Voir les résultats
-                      </button>
-                    </div>
+            <div className="space-y-10">
+              <section>
+                <h2 className="text-lg font-bold text-gray-900 mb-4">Pronostics en cours</h2>
+                {inProgress.length === 0 ? (
+                  <div className="p-6 text-center text-gray-500 bg-white rounded-xl border border-gray-100">
+                    Aucun pronostic en attente de résultats.
                   </div>
+                ) : (
+                  <div className="space-y-6">{inProgress.map(renderEntry)}</div>
+                )}
+              </section>
 
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <p className="text-sm font-bold text-gray-700 mb-1">Top pronostiqué</p>
-                      <div className="flex flex-wrap gap-2">
-                        {topGuesses(prediction).length === 0 ? (
-                          <span className="text-sm text-gray-400">—</span>
-                        ) : (
-                          topGuesses(prediction).map((queen) => (
-                            <Chip
-                              key={queen}
-                              label={queen}
-                              correct={result ? result.top.includes(queen) : null}
-                            />
-                          ))
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-gray-700 mb-1">Bottom pronostiqué</p>
-                      <div className="flex flex-wrap gap-2">
-                        {bottomGuesses(prediction).length === 0 ? (
-                          <span className="text-sm text-gray-400">—</span>
-                        ) : (
-                          bottomGuesses(prediction).map((queen) => (
-                            <Chip
-                              key={queen}
-                              label={queen}
-                              correct={result ? result.bottom.includes(queen) : null}
-                            />
-                          ))
-                        )}
-                      </div>
-                    </div>
+              <section>
+                <h2 className="text-lg font-bold text-gray-900 mb-4">Pronostics terminés</h2>
+                {finished.length === 0 ? (
+                  <div className="p-6 text-center text-gray-500 bg-white rounded-xl border border-gray-100">
+                    Aucun pronostic terminé pour le moment.
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <GuessRow
-                      label="Gagnante"
-                      guess={prediction.winner}
-                      correct={result ? prediction.winner === result.winner : null}
-                    />
-                    <GuessRow
-                      label="Éliminée"
-                      guess={prediction.eliminee}
-                      correct={result ? prediction.eliminee === result.eliminee : null}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <GuessRow
-                      label="Mini-Défi"
-                      guess={prediction.miniDefi}
-                      correct={result ? prediction.miniDefi === result.miniDefi : null}
-                    />
-                    <GuessRow
-                      label="Maxi-Défi"
-                      guess={prediction.maxiDefi}
-                      correct={result ? prediction.maxiDefi === result.maxiDefi : null}
-                    />
-                  </div>
-                </div>
-              ))}
+                ) : (
+                  <div className="space-y-6">{finished.map(renderEntry)}</div>
+                )}
+              </section>
             </div>
           )}
         </div>

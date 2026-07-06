@@ -103,7 +103,7 @@ export default function AdminPage() {
   const [resultsEliminee, setResultsEliminee] = useState<string | null>(null);
   const [resultsMiniDefi, setResultsMiniDefi] = useState<string | null>(null);
   const [resultsMaxiDefi, setResultsMaxiDefi] = useState<string | null>(null);
-  const [scoringRules, setScoringRules] = useState<ScoringRules>({
+  const defaultScoringRules: ScoringRules = {
     top: SCORING_RULES.top,
     bottom: SCORING_RULES.bottom,
     safe: SCORING_RULES.safe,
@@ -111,9 +111,37 @@ export default function AdminPage() {
     eliminee: SCORING_RULES.eliminee,
     miniDefi: SCORING_RULES.miniDefi,
     maxiDefi: SCORING_RULES.maxiDefi,
-  });
+  };
+  const [scoringRules, setScoringRules] = useState<ScoringRules>(defaultScoringRules);
   const [savingResults, setSavingResults] = useState(false);
+  const [resultsHistory, setResultsHistory] = useState<ResultData[]>([]);
   const router = useRouter();
+
+  // Recharge le formulaire "Résultats de l'épisode" pour un numéro donné : reprend les
+  // résultats déjà saisis s'ils existent (édition), sinon repart d'un formulaire vierge
+  // (nouvel épisode : aucune Queen ni barème hérité de l'épisode précédent).
+  const loadResultsForEpisode = async (numero: number) => {
+    const resultDoc = await getDoc(doc(db, "results", String(numero)));
+    if (resultDoc.exists()) {
+      const data = resultDoc.data() as ResultData;
+      const status: Record<string, QueenChoice> = {};
+      data.top.forEach((q) => { status[q] = "top"; });
+      data.bottom.forEach((q) => { status[q] = "bottom"; });
+      setResultsQueensStatus(status);
+      setResultsWinner(data.winner);
+      setResultsEliminee(data.eliminee);
+      setResultsMiniDefi(data.miniDefi);
+      setResultsMaxiDefi(data.maxiDefi);
+      setScoringRules(data.scoringRules || defaultScoringRules);
+    } else {
+      setResultsQueensStatus({});
+      setResultsWinner(null);
+      setResultsEliminee(null);
+      setResultsMiniDefi(null);
+      setResultsMaxiDefi(null);
+      setScoringRules(defaultScoringRules);
+    }
+  };
 
   const handleAddQueenRow = () => {
     setQueensList((prev) => [...prev, { name: "", eliminee: false }]);
@@ -231,20 +259,16 @@ export default function AdminPage() {
 
         // Résultats déjà saisis pour l'épisode en cours (pour édition/correction)
         if (numero !== null) {
-          const resultDoc = await getDoc(doc(db, "results", String(numero)));
-          if (resultDoc.exists()) {
-            const data = resultDoc.data() as ResultData;
-            const status: Record<string, QueenChoice> = {};
-            data.top.forEach((q) => { status[q] = "top"; });
-            data.bottom.forEach((q) => { status[q] = "bottom"; });
-            setResultsQueensStatus(status);
-            setResultsWinner(data.winner);
-            setResultsEliminee(data.eliminee);
-            setResultsMiniDefi(data.miniDefi);
-            setResultsMaxiDefi(data.maxiDefi);
-            if (data.scoringRules) setScoringRules(data.scoringRules);
-          }
+          await loadResultsForEpisode(numero);
         }
+
+        // Historique de tous les résultats déjà publiés (pour la partie non modifiable)
+        const resultsHistorySnap = await getDocs(collection(db, "results"));
+        setResultsHistory(
+          resultsHistorySnap.docs
+            .map((d) => d.data() as ResultData)
+            .sort((a, b) => b.numero - a.numero)
+        );
 
         // Charger la liste des joueurs, avec leur uid et s'ils ont déjà pronostiqué l'épisode en cours
         const usersSnap = await getDocs(collection(db, "users"));
@@ -380,6 +404,7 @@ export default function AdminPage() {
 
       await batch.commit();
       setQueensList(updatedQueensList);
+      setResultsHistory((prev) => [resultData, ...prev.filter((r) => r.numero !== episodeNum)]);
 
       // Recalcule le score total de chaque joueur concerné
       const newScores: Record<string, number> = {};
@@ -405,6 +430,9 @@ export default function AdminPage() {
         numero: episodeNum,
         dateDiffusion: Timestamp.fromDate(new Date(dateDiffusion))
       });
+      // Le formulaire "Résultats" est réinitialisé (ou recharge les résultats déjà saisis
+      // pour ce numéro) : il ne doit jamais garder les sélections de l'épisode précédent.
+      await loadResultsForEpisode(episodeNum);
       alert("Épisode mis à jour !");
     } catch (err) {
       alert("Erreur lors de la mise à jour");
@@ -713,6 +741,49 @@ export default function AdminPage() {
               >
                 {savingResults ? "Calcul des scores en cours..." : "Enregistrer les résultats et calculer les scores"}
               </button>
+            </section>
+
+            <section className="bg-white/95 p-8 rounded-[15px] shadow-lg md:col-span-2">
+              <h2 className="text-2xl font-bold text-gray-950 mb-2">Historique des résultats</h2>
+              <p className="text-xs text-gray-500 mb-4">
+                Résultats déjà publiés pour les épisodes précédents. Non modifiables : passe par la
+                section ci-dessus tant que l&apos;épisode est encore l&apos;épisode en cours.
+              </p>
+
+              {resultsHistory.filter((r) => r.numero < episodeNum).length === 0 ? (
+                <p className="text-sm text-gray-500">Aucun résultat publié pour le moment.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead className="border-b border-gray-100">
+                      <tr>
+                        <th className="py-2 pr-4 text-gray-500 font-bold uppercase text-xs">Épisode</th>
+                        <th className="py-2 pr-4 text-gray-500 font-bold uppercase text-xs">Top</th>
+                        <th className="py-2 pr-4 text-gray-500 font-bold uppercase text-xs">Bottom</th>
+                        <th className="py-2 pr-4 text-gray-500 font-bold uppercase text-xs">Gagnante</th>
+                        <th className="py-2 pr-4 text-gray-500 font-bold uppercase text-xs">Éliminée</th>
+                        <th className="py-2 pr-4 text-gray-500 font-bold uppercase text-xs">Mini-Défi</th>
+                        <th className="py-2 text-gray-500 font-bold uppercase text-xs">Maxi-Défi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {resultsHistory
+                        .filter((r) => r.numero < episodeNum)
+                        .map((r) => (
+                          <tr key={r.numero}>
+                            <td className="py-3 pr-4 text-gray-900 font-bold">{r.numero}</td>
+                            <td className="py-3 pr-4 text-gray-900">{r.top.join(", ")}</td>
+                            <td className="py-3 pr-4 text-gray-900">{r.bottom.join(", ")}</td>
+                            <td className="py-3 pr-4 text-gray-900">{r.winner}</td>
+                            <td className="py-3 pr-4 text-gray-900">{r.eliminee}</td>
+                            <td className="py-3 pr-4 text-gray-900">{r.miniDefi}</td>
+                            <td className="py-3 text-gray-900">{r.maxiDefi}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </section>
 
           </div>

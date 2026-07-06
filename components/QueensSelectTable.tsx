@@ -14,8 +14,11 @@ interface QueensSelectTableProps {
 export default function QueensSelectTable({ queens, values, onChange, showImages = false }: QueensSelectTableProps) {
   const [brokenImages, setBrokenImages] = useState<Set<string>>(new Set());
 
-  const topCount = Object.values(values).filter((v) => v === "top").length;
-  const bottomCount = Object.values(values).filter((v) => v === "bottom").length;
+  // On ne compte que les valeurs des Queens actuellement affichées : une Queen retirée
+  // de la liste (ex. éliminée puis exclue du tableau) ne doit plus bloquer les sélections.
+  const relevantValues = queens.map((queen) => values[queen]).filter(Boolean);
+  const topCount = relevantValues.filter((v) => v === "top").length;
+  const bottomCount = relevantValues.filter((v) => v === "bottom").length;
 
   const isOptionDisabled = (queen: string, option: "top" | "bottom") => {
     const count = option === "top" ? topCount : bottomCount;

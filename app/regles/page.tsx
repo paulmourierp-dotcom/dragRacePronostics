@@ -31,21 +31,20 @@ const ReglesPage = () => {
     }, []);
 
   return (
-    <AuthGuard>
-      <main className="min-h-screen bg-gray-50">
-        <div className="p-6 max-w-5xl mx-auto">
-        <Header isAdmin={userData?.role === "admin"} />
-          <h1 className="text-4xl font-extrabold text-gray-950 mb-8">Règles du Jeu</h1>
+    <main className="min-h-screen bg-gray-50">
+      <div className="p-6 max-w-5xl mx-auto">
+      <Header isAdmin={userData?.role === "admin"} />
+        <h1 className="text-4xl font-extrabold text-gray-950 mb-8">Règles du Jeu</h1>
+        
+        <div className="bg-white p-8 rounded-[20px] shadow-sm border border-gray-100 space-y-8">
           
-          <div className="bg-white p-8 rounded-[20px] shadow-sm border border-gray-100 space-y-8">
-            
-            <section>
-              <h2 className="text-2xl font-bold text-purple-700 mb-4">1. Le principe</h2>
-              <p className="text-gray-700 leading-relaxed">
-                Chaque semaine, à l&apos;approche du nouvel épisode de Drag Race France, tu es invité à faire tes pronostics. 
-                L&apos;objectif est de prédire le déroulement de l&apos;épisode pour cumuler un maximum de points.
-              </p>
-            </section>
+          <section>
+            <h2 className="text-2xl font-bold text-purple-700 mb-4">1. Le principe</h2>
+            <p className="text-gray-700 leading-relaxed">
+              Chaque semaine, à l&apos;approche du nouvel épisode de Drag Race France, tu es invité à faire tes pronostics. 
+              L&apos;objectif est de prédire le déroulement de l&apos;épisode pour cumuler un maximum de points.
+            </p>
+          </section>
 
             <section>
               <h2 className="text-2xl font-bold text-purple-700 mb-4">2. Les pronostics</h2>
