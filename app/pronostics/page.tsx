@@ -1,6 +1,7 @@
 "use client"
 import AuthGuard from "@/components/AuthGuard";
 import Header from "@/components/Header";
+import LoadingScreen from "@/components/LoadingScreen";
 import { auth, db } from "@/lib/firebase";
 import { ConfigData } from "@/types/config";
 import { PredictionData } from "@/types/prediction";
@@ -9,6 +10,7 @@ import { QueenData } from "@/types/gameData";
 import { normalizeQueens } from "@/lib/queens";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import QueensSelectTable, { QueenChoice } from "@/components/QueensSelectTable";
 import { useToast } from "@/contexts/ToastContext";
 
@@ -27,47 +29,52 @@ export default function PronosticPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const showToast = useToast();
+  const router = useRouter();
 
   useEffect(() => {
     const fetchData = async () => {
-      const user = auth.currentUser;
-      if (!user) return;
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
 
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      const myData = userDoc.data();
-      setUserData(myData ? (myData as UserData) : null);
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        const myData = userDoc.data();
+        setUserData(myData ? (myData as UserData) : null);
 
-      const [nextEpisodeSnap, queensSnap] = await Promise.all([
-        getDoc(doc(db, "config", "next_episode")),
-        getDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9")),
-      ]);
+        const [nextEpisodeSnap, queensSnap] = await Promise.all([
+          getDoc(doc(db, "config", "next_episode")),
+          getDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9")),
+        ]);
 
-      const nextEpisode = nextEpisodeSnap.exists() ? (nextEpisodeSnap.data() as ConfigData) : null;
-      const numero = nextEpisode?.numero ?? null;
-      setEpisodeNum(numero);
-      const episodeDate = nextEpisode?.dateDiffusion ? nextEpisode.dateDiffusion.toDate() : null;
-      setIsPastDeadline(episodeDate !== null && episodeDate.getTime() < Date.now());
+        const nextEpisode = nextEpisodeSnap.exists() ? (nextEpisodeSnap.data() as ConfigData) : null;
+        const numero = nextEpisode?.numero ?? null;
+        setEpisodeNum(numero);
+        const episodeDate = nextEpisode?.dateDiffusion ? nextEpisode.dateDiffusion.toDate() : null;
+        setIsPastDeadline(episodeDate !== null && episodeDate.getTime() < Date.now());
 
-      if (queensSnap.exists()) {
-        const gameData = queensSnap.data();
-        setQueens(normalizeQueens(gameData.queens || []));
-        setMiniDefisOptions(gameData.minidefis || []);
-        setMaxiDefisOptions(gameData.maxidefis || []);
-      }
-
-      if (numero !== null) {
-        const predictionSnap = await getDoc(doc(db, "predictions", `${user.uid}_ep${numero}`));
-        if (predictionSnap.exists()) {
-          const data = predictionSnap.data() as PredictionData;
-          setQueensResults(data.queensResults || {});
-          setWinner(data.winner ?? null);
-          setLoser(data.eliminee ?? null);
-          setMiniDefi(data.miniDefi ?? null);
-          setMaxiDefi(data.maxiDefi ?? null);
+        if (queensSnap.exists()) {
+          const gameData = queensSnap.data();
+          setQueens(normalizeQueens(gameData.queens || []));
+          setMiniDefisOptions(gameData.minidefis || []);
+          setMaxiDefisOptions(gameData.maxidefis || []);
         }
-      }
 
-      setLoading(false);
+        if (numero !== null) {
+          const predictionSnap = await getDoc(doc(db, "predictions", `${user.uid}_ep${numero}`));
+          if (predictionSnap.exists()) {
+            const data = predictionSnap.data() as PredictionData;
+            setQueensResults(data.queensResults || {});
+            setWinner(data.winner ?? null);
+            setLoser(data.eliminee ?? null);
+            setMiniDefi(data.miniDefi ?? null);
+            setMaxiDefi(data.maxiDefi ?? null);
+          }
+        }
+      } catch (error) {
+        console.error("Erreur :", error);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchData();
@@ -110,6 +117,7 @@ export default function PronosticPage() {
         { merge: true }
       );
       showToast("Pronostics enregistrés !", "success");
+      router.push("/historique");
     } catch (error) {
       console.error("Erreur :", error);
       showToast("Erreur lors de l'enregistrement.", "error");
@@ -121,7 +129,7 @@ export default function PronosticPage() {
   if (loading) {
     return (
       <AuthGuard>
-        <div className="p-10 text-center text-gray-500">Chargement...</div>
+        <LoadingScreen message="Les Queens enfilent leurs looks pour cet épisode..." />
       </AuthGuard>
     );
   }

@@ -113,3 +113,18 @@ body {
     filter: none !important;
   }
 }
+
+@keyframes drag-pulse {
+  0%, 100% {
+    transform: scale(0.85);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
+.animate-drag-pulse {
+  animation: drag-pulse 1.6s ease-in-out infinite;
+}

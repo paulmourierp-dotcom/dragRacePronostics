@@ -23,6 +23,7 @@ import { CrownPredictionData } from "@/types/crown";
 import { normalizeQueens } from "@/lib/queens";
 import { SCORING_RULES } from "@/lib/scoring";
 import Header from "@/components/Header";
+import LoadingScreen from "@/components/LoadingScreen";
 import QueensSelectTable, { QueenChoice } from "@/components/QueensSelectTable";
 import NextEpisodeModal from "@/components/NextEpisodeModal";
 import { useToast } from "@/contexts/ToastContext";
@@ -521,7 +522,7 @@ export default function AdminPage() {
     }
   };
 
-  if (loading) return <div className="p-10 text-white text-center">Chargement...</div>;
+  if (loading) return <LoadingScreen message="Le jury délibère, un instant..." />;
   if (!isAdmin) return null;
 
   return (

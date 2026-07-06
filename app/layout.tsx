@@ -39,6 +39,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { ToastProvider } from "@/contexts/ToastContext";
+import LoadingScreen from "@/components/LoadingScreen";
 import "./globals.css";
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -58,7 +59,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, [router, pathname]);
 
-  if (loading) return <body>Chargement...</body>;
+  if (loading) return <body><LoadingScreen /></body>;
 
   return (
     <html lang="fr">

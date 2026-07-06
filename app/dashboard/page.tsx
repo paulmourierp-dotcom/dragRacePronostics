@@ -50,6 +50,7 @@ export default function DashboardPage() {
   const [myRank, setMyRank] = useState<number>(0);
   const [selectedPlayer, setSelectedPlayer] = useState<(PlayerRow & { rank: number }) | null>(null);
   const [nextEpisodeData, setNextEpisodeData] = useState<ConfigData | null>(null);
+  const [hasPrediction, setHasPrediction] = useState(false);
   const [queens, setQueens] = useState<string[]>([]);
   const [crownLocked, setCrownLocked] = useState(false);
   const [showCrownModal, setShowCrownModal] = useState(false);
@@ -57,10 +58,11 @@ export default function DashboardPage() {
 
     useEffect(() => {
         const fetchData = async () => {
+          try {
             // 1. Récupérer mon profil
             const user = auth.currentUser;
             if (!user) return;
-            
+
             const userDoc = await getDoc(doc(db, "users", user.uid));
             const myData = userDoc.data();
             if (myData) {
@@ -85,8 +87,17 @@ export default function DashboardPage() {
             setMyRank(myIndex === -1 ? 0 : ranks[myIndex]);
 
             const configSnap = await getDoc(doc(db, "config", "next_episode"));
-            if (configSnap.exists()) {
-            setNextEpisodeData(configSnap.data() as ConfigData);
+            const nextEpisode = configSnap.exists() ? (configSnap.data() as ConfigData) : null;
+            if (nextEpisode) {
+            setNextEpisodeData(nextEpisode);
+            }
+
+            // 3bis. Savoir si j'ai déjà un pronostic enregistré pour cet épisode
+            if (nextEpisode?.numero != null) {
+            const predictionSnap = await getDoc(doc(db, "predictions", `${user.uid}_ep${nextEpisode.numero}`));
+            setHasPrediction(predictionSnap.exists());
+            } else {
+            setHasPrediction(false);
             }
 
             // 4. Récupérer la liste des Queens encore en course (pour le pronostic couronne)
@@ -103,6 +114,9 @@ export default function DashboardPage() {
             if (crownResultSnap.exists()) {
             setCrownLocked((crownResultSnap.data() as CrownResultData).locked ?? false);
             }
+          } catch (error) {
+            console.error("Erreur :", error);
+          }
         };
 
         fetchData();
@@ -194,8 +208,15 @@ export default function DashboardPage() {
 
         <section className="space-y-6">
             <section className="bg-white p-6 rounded-[15px] shadow-sm border border-gray-100">
-                <h2 className="text-xl font-bold mb-6 text-gray-950">Prochain Épisode</h2>
-                
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-gray-950">Prochain Épisode</h2>
+                  {hasPrediction && (
+                    <span className="inline-flex items-center gap-1 text-green-700 bg-green-50 border border-green-200 rounded-full px-3 py-1 text-xs font-semibold">
+                      ✓ Pronostic enregistré
+                    </span>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-2 gap-6 items-center">
                     {/* Colonne Gauche : Infos */}
                     <div className="space-y-2">

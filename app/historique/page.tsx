@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import Header from "@/components/Header";
+import LoadingScreen from "@/components/LoadingScreen";
 import EpisodeResultModal from "@/components/EpisodeResultModal";
 import PredictionBreakdown from "@/components/PredictionBreakdown";
 import { auth, db } from "@/lib/firebase";
@@ -31,43 +33,48 @@ export default function HistoriquePage() {
   const [loading, setLoading] = useState(true);
   const [modalResult, setModalResult] = useState<ResultData | null>(null);
   const [nextEpisode, setNextEpisode] = useState<ConfigData | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchData = async () => {
-      const user = auth.currentUser;
-      if (!user) return;
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
 
-      const [userDoc, nextEpisodeSnap] = await Promise.all([
-        getDoc(doc(db, "users", user.uid)),
-        getDoc(doc(db, "config", "next_episode")),
-      ]);
+        const [userDoc, nextEpisodeSnap] = await Promise.all([
+          getDoc(doc(db, "users", user.uid)),
+          getDoc(doc(db, "config", "next_episode")),
+        ]);
 
-      const myData = userDoc.data();
-      setUserData(myData ? (myData as UserData) : null);
+        const myData = userDoc.data();
+        setUserData(myData ? (myData as UserData) : null);
 
-      const nextEpisodeConfig = nextEpisodeSnap.exists() ? (nextEpisodeSnap.data() as ConfigData) : null;
-      setNextEpisode(nextEpisodeConfig);
+        const nextEpisodeConfig = nextEpisodeSnap.exists() ? (nextEpisodeSnap.data() as ConfigData) : null;
+        setNextEpisode(nextEpisodeConfig);
 
-      const predsSnap = await getDocs(
-        query(collection(db, "predictions"), where("userId", "==", user.uid))
-      );
-      const predictions = predsSnap.docs.map((d) => d.data() as PredictionData);
+        const predsSnap = await getDocs(
+          query(collection(db, "predictions"), where("userId", "==", user.uid))
+        );
+        const predictions = predsSnap.docs.map((d) => d.data() as PredictionData);
 
-      const results = await Promise.all(
-        predictions.map((p) => getDoc(doc(db, "results", String(p.episodeId))))
-      );
+        const results = await Promise.all(
+          predictions.map((p) => getDoc(doc(db, "results", String(p.episodeId))))
+        );
 
-      const visibleEntries = predictions
-        .map((prediction, i) => ({
-          episodeId: prediction.episodeId,
-          prediction,
-          result: results[i].exists() ? (results[i].data() as ResultData) : null,
-        }))
-        .sort((a, b) => b.episodeId - a.episodeId);
+        const visibleEntries = predictions
+          .map((prediction, i) => ({
+            episodeId: prediction.episodeId,
+            prediction,
+            result: results[i].exists() ? (results[i].data() as ResultData) : null,
+          }))
+          .sort((a, b) => b.episodeId - a.episodeId);
 
-      setEntries(visibleEntries);
-
-      setLoading(false);
+        setEntries(visibleEntries);
+      } catch (error) {
+        console.error("Erreur :", error);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchData();
@@ -91,6 +98,14 @@ export default function HistoriquePage() {
             </span>
           ) : (
             <span className="text-sm text-gray-500">En attente des résultats</span>
+          )}
+          {isStillOpen && (
+            <button
+              onClick={() => router.push("/pronostics")}
+              className="text-sm px-3 py-1 rounded bg-purple-600 text-white font-semibold"
+            >
+              Modifier
+            </button>
           )}
           <button
             onClick={() => result && setModalResult(result)}
@@ -119,7 +134,7 @@ export default function HistoriquePage() {
           <h1 className="text-3xl font-bold mb-6 text-gray-900">Historique des pronostics</h1>
 
           {loading ? (
-            <div className="p-10 text-center text-gray-500">Chargement...</div>
+            <LoadingScreen message="On compile les scores des dernières lip-syncs..." />
           ) : entries.length === 0 ? (
             <div className="p-10 text-center text-gray-500">
               Aucun pronostic dans l&apos;historique pour le moment.
