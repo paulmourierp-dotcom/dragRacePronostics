@@ -43,22 +43,25 @@ export default function HistoriquePage() {
       const predsSnap = await getDocs(
         query(collection(db, "predictions"), where("userId", "==", user.uid))
       );
-      const predictions = predsSnap
-        .docs.map((d) => d.data() as PredictionData)
-        .filter((p) => p.episodeId !== nextEpisodeNumero)
-        .sort((a, b) => b.episodeId - a.episodeId);
+      const predictions = predsSnap.docs.map((d) => d.data() as PredictionData);
 
       const results = await Promise.all(
         predictions.map((p) => getDoc(doc(db, "results", String(p.episodeId))))
       );
 
-      setEntries(
-        predictions.map((prediction, i) => ({
+      const visibleEntries = predictions
+        .map((prediction, i) => ({
           episodeId: prediction.episodeId,
           prediction,
           result: results[i].exists() ? (results[i].data() as ResultData) : null,
         }))
-      );
+        // Le pronostic de l'épisode encore ouvert (pas de résultat officiel publié) reste
+        // exclusivement sur /pronostics. Dès qu'un résultat est publié pour cet épisode, on
+        // l'affiche ici même si l'admin n'a pas encore avancé next_episode.numero.
+        .filter((e) => !(e.episodeId === nextEpisodeNumero && e.result === null))
+        .sort((a, b) => b.episodeId - a.episodeId);
+
+      setEntries(visibleEntries);
 
       setLoading(false);
     };

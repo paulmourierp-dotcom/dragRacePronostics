@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
-import { ConfigData } from "@/types/config";
 import { PredictionData } from "@/types/prediction";
 import { ResultData } from "@/types/result";
 import PredictionBreakdown from "@/components/PredictionBreakdown";
@@ -17,7 +16,7 @@ interface PlayerDetailsModalProps {
 interface EpisodeEntry {
   episodeId: number;
   prediction: PredictionData;
-  result: ResultData | null;
+  result: ResultData;
 }
 
 export default function PlayerDetailsModal({ uid, surnom, rank, onClose }: PlayerDetailsModalProps) {
@@ -27,31 +26,27 @@ export default function PlayerDetailsModal({ uid, surnom, rank, onClose }: Playe
 
   useEffect(() => {
     const fetchData = async () => {
-      // Le pronostic du prochain épisode (non encore diffusé) reste privé, comme sur /historique
-      const nextEpisodeSnap = await getDoc(doc(db, "config", "next_episode"));
-      const nextEpisodeNumero = nextEpisodeSnap.exists()
-        ? (nextEpisodeSnap.data() as ConfigData).numero
-        : null;
-
       const predsSnap = await getDocs(
         query(collection(db, "predictions"), where("userId", "==", uid))
       );
-      const predictions = predsSnap.docs
-        .map((d) => d.data() as PredictionData)
-        .filter((p) => p.episodeId !== nextEpisodeNumero)
-        .sort((a, b) => b.episodeId - a.episodeId);
+      const predictions = predsSnap.docs.map((d) => d.data() as PredictionData);
 
       const results = await Promise.all(
         predictions.map((p) => getDoc(doc(db, "results", String(p.episodeId))))
       );
 
-      setEntries(
-        predictions.map((prediction, i) => ({
+      // Un autre joueur ne doit jamais voir un pronostic tant que le résultat officiel
+      // n'a pas été publié pour cet épisode, peu importe où en est next_episode.numero.
+      const scoredEntries = predictions
+        .map((prediction, i) => ({
           episodeId: prediction.episodeId,
           prediction,
           result: results[i].exists() ? (results[i].data() as ResultData) : null,
         }))
-      );
+        .filter((e): e is EpisodeEntry => e.result !== null)
+        .sort((a, b) => b.episodeId - a.episodeId);
+
+      setEntries(scoredEntries);
       setLoading(false);
     };
 
@@ -81,9 +76,7 @@ export default function PlayerDetailsModal({ uid, surnom, rank, onClose }: Playe
                     className="w-full flex justify-between items-center px-4 py-3 bg-gray-50 text-left"
                   >
                     <span className="font-bold text-gray-900">Épisode {episodeId}</span>
-                    <span className="font-bold text-purple-700">
-                      {result ? `${prediction.pointsEarned ?? 0} pts` : "En attente des résultats"}
-                    </span>
+                    <span className="font-bold text-purple-700">{prediction.pointsEarned ?? 0} pts</span>
                   </button>
                   {isOpen && (
                     <div className="p-4">
