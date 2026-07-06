@@ -30,6 +30,7 @@ import { useToast } from "@/contexts/ToastContext";
 interface UserRow extends UserData {
   uid: string;
   hasPredicted: boolean;
+  hasCrownPrediction: boolean;
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -283,7 +284,8 @@ export default function AdminPage() {
             .sort((a, b) => b.numero - a.numero)
         );
 
-        // Charger la liste des joueurs, avec leur uid et s'ils ont déjà pronostiqué l'épisode en cours
+        // Charger la liste des joueurs, avec leur uid, s'ils ont déjà pronostiqué l'épisode en
+        // cours et s'ils ont pronostiqué la gagnante de la saison
         const usersSnap = await getDocs(collection(db, "users"));
         const usersList: UserRow[] = usersSnap.docs.map((userSnapDoc) => {
           const data = userSnapDoc.data();
@@ -294,6 +296,7 @@ export default function AdminPage() {
             score: data.score ?? 0,
             role: data.role || "user",
             hasPredicted: false,
+            hasCrownPrediction: false,
           };
         });
 
@@ -305,6 +308,13 @@ export default function AdminPage() {
             u.hasPredicted = predictionChecks[i].exists();
           });
         }
+
+        const crownPredictionChecks = await Promise.all(
+          usersList.map((u) => getDoc(doc(db, "crownPredictions", u.uid)))
+        );
+        usersList.forEach((u, i) => {
+          u.hasCrownPrediction = crownPredictionChecks[i].exists();
+        });
 
         setUsers(usersList);
       } else {
@@ -564,6 +574,7 @@ export default function AdminPage() {
                     <tr>
                       <th className="py-2 text-gray-500 font-bold uppercase text-xs">Surnom</th>
                       <th className="py-2 text-gray-500 font-bold uppercase text-xs text-center">Pronostic réalisé</th>
+                      <th className="py-2 text-gray-500 font-bold uppercase text-xs text-center">Pronostic gagnante</th>
                       <th className="py-2 text-gray-500 font-bold uppercase text-xs text-right">Score</th>
                     </tr>
                   </thead>
@@ -572,6 +583,7 @@ export default function AdminPage() {
                       <tr key={u.uid}>
                         <td className="py-3 text-gray-900 font-medium">{u.surnom}</td>
                         <td className="py-3 text-center">{u.hasPredicted ? "✅" : "❌"}</td>
+                        <td className="py-3 text-center">{u.hasCrownPrediction ? "✅" : "❌"}</td>
                         <td className="py-3 text-gray-900 font-bold text-right">{u.score ?? 0} pts</td>
                       </tr>
                     ))}
