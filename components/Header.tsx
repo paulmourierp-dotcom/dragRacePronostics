@@ -12,6 +12,7 @@ export default function Header({ isAdmin }: HeaderProps) {
   const pathname = usePathname();
   const isDashboard = pathname === "/dashboard";
   const isPronostics = pathname === "/pronostics";
+  const isHistorique = pathname === "/historique";
   const isRegles = pathname === "/regles";
 
   return (
@@ -28,6 +29,9 @@ export default function Header({ isAdmin }: HeaderProps) {
         )}
         {!isPronostics && (
           <button onClick={() => router.push("/pronostics")} className="p-2 text-sm text-gray-600">Pronostic</button>
+        )}
+        {!isHistorique && (
+          <button onClick={() => router.push("/historique")} className="p-2 text-sm text-gray-600">Historique</button>
         )}
         {!isRegles && (
           <button onClick={() => router.push("/regles")} className="p-2 text-sm text-gray-600">Règles</button>
