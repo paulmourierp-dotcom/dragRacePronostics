@@ -44,8 +44,10 @@ const ReglesPage = () => {
             <p className="text-gray-700 leading-relaxed">
               Chaque semaine, à l&apos;approche du nouvel épisode de Drag Race France, tu es invité à faire tes pronostics. 
               L&apos;objectif est de prédire le déroulement de l&apos;épisode pour cumuler un maximum de points.
-              Avant le premier épisode, tu vas devoir choisir la queen qui, selon toi, remportera la saison ! (Une fois le premier épisode diffusé, tu ne pourras plus changer ton choix).
               NE PAS oublier de pronostiquer chaque semaine, sinon tu ne pourras pas cumuler de points pour l&apos;épisode en question.
+            </p>
+            <p className="text-gray-700 leading-relaxed mt-4">
+            Avant le premier épisode, tu vas devoir choisir la queen qui, selon toi, remportera la saison ! (Une fois le premier épisode diffusé, tu ne pourras plus changer ton choix).
             </p>
             <p className="text-gray-700 leading-relaxed mt-4">
               Le meilleur pronostiqueur remportera le titre de <span className="font-bold text-purple-600">Grand(e) Pronostiqueur(se)</span> de la saison et un cadeau surprise !
