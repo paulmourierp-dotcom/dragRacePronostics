@@ -44,6 +44,7 @@ const ReglesPage = () => {
             <p className="text-gray-700 leading-relaxed">
               Chaque semaine, à l&apos;approche du nouvel épisode de Drag Race France, tu es invité à faire tes pronostics. 
               L&apos;objectif est de prédire le déroulement de l&apos;épisode pour cumuler un maximum de points.
+              Avant le premier épisode, tu vas devoir choisir la queen qui, selon toi, remportera la saison ! (Une fois le premier épisode diffusé, tu ne pourras plus changer ton choix).
             </p>
           </section>
 
@@ -53,6 +54,7 @@ const ReglesPage = () => {
                 <li>Tu peux pronostiquer jusqu&apos;à la date limite indiquée sur ton Dashboard.</li>
                 <li>Une fois la date passée, les pronostics sont verrouillés.</li>
                 <li>Chaque catégorie de points (Mini-défi, Maxi-défi, Runway) a un barème spécifique.</li>
+                <li>Les résultats sont calculés à la fin de chaque épisode et sont saisis par les administrateurs.</li>
               </ul>
             </section>
 
@@ -61,9 +63,13 @@ const ReglesPage = () => {
               <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
                 <p className="font-semibold text-gray-800 mb-2">Exemple de barème :</p>
                 <ul className="text-gray-700 space-y-1">
-                  <li>• Bonne Queen pour le Mini-défi : <span className="font-bold text-purple-600">5 pts</span></li>
-                  <li>• Bonne Queen pour le Maxi-défi : <span className="font-bold text-purple-600">10 pts</span></li>
-                  <li>• Top / Bottom : <span className="font-bold text-purple-600">5 pts</span></li>
+                  <li>• Mini-défi trouvé : <span className="font-bold text-purple-600">10 pts</span></li>
+                  <li>• Maxi-défi trouvé : <span className="font-bold text-purple-600">10 pts</span></li>
+                  <li>• Top trouvé : <span className="font-bold text-purple-600">5 pts</span></li>
+                  <li>• Bottom trouvé : <span className="font-bold text-purple-600">5 pts</span></li>
+                  <li>• Safe trouvé : <span className="font-bold text-purple-600">2 pts</span></li>
+                  <li>• Gagnante de l&apos;épisode : <span className="font-bold text-purple-600">10 pts</span></li>
+                  <li>• Perdante de l&apos;épisode : <span className="font-bold text-purple-600">10 pts</span></li>
                 </ul>
               </div>
             </section>
