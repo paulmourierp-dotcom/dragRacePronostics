@@ -10,6 +10,7 @@ import { normalizeQueens } from "@/lib/queens";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import QueensSelectTable, { QueenChoice } from "@/components/QueensSelectTable";
+import { useToast } from "@/contexts/ToastContext";
 
 export default function PronosticPage() {
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -25,6 +26,7 @@ export default function PronosticPage() {
   const [maxiDefi, setMaxiDefi] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const showToast = useToast();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -107,10 +109,10 @@ export default function PronosticPage() {
         },
         { merge: true }
       );
-      alert("Pronostics enregistrés !");
+      showToast("Pronostics enregistrés !", "success");
     } catch (error) {
       console.error("Erreur :", error);
-      alert("Erreur lors de l'enregistrement.");
+      showToast("Erreur lors de l'enregistrement.", "error");
     } finally {
       setSaving(false);
     }

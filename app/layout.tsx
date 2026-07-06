@@ -38,6 +38,7 @@ import { useEffect, useState, ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { ToastProvider } from "@/contexts/ToastContext";
 import "./globals.css";
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -61,7 +62,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
   return (
     <html lang="fr">
-      <body>{children}</body>
+      <body>
+        <ToastProvider>{children}</ToastProvider>
+      </body>
     </html>
   );
 }

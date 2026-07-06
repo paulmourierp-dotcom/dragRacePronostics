@@ -12,6 +12,7 @@ import Image from 'next/image';
 import Header from "@/components/Header";
 import CrownPredictionModal from "@/components/CrownPredictionModal";
 import PlayerDetailsModal from "@/components/PlayerDetailsModal";
+import { useToast } from "@/contexts/ToastContext";
 
 const formatDateDiffusion = (timestamp?: Timestamp) =>
   timestamp
@@ -52,6 +53,7 @@ export default function DashboardPage() {
   const [queens, setQueens] = useState<string[]>([]);
   const [crownLocked, setCrownLocked] = useState(false);
   const [showCrownModal, setShowCrownModal] = useState(false);
+  const showToast = useToast();
 
     useEffect(() => {
         const fetchData = async () => {
@@ -109,6 +111,24 @@ export default function DashboardPage() {
   const ranks = computeRanks(allPlayers);
   const rankedPlayers = allPlayers.map((player, i) => ({ ...player, rank: ranks[i] }));
   const isTied = (rank: number) => ranks.filter((r) => r === rank).length > 1;
+
+  // Revérifie l'épisode en base avant de rediriger : si l'admin est passé à l'épisode
+  // suivant depuis que la page a été chargée, on prévient au lieu d'envoyer sur /pronostics.
+  const handleGoToPronostics = async () => {
+    const configSnap = await getDoc(doc(db, "config", "next_episode"));
+    const freshConfig = configSnap.exists() ? (configSnap.data() as ConfigData) : null;
+
+    if (nextEpisodeData && freshConfig && freshConfig.numero !== nextEpisodeData.numero) {
+      showToast(
+        `L'épisode ${nextEpisodeData.numero} est déjà terminé, l'épisode ${freshConfig.numero} est maintenant en cours.`,
+        "error"
+      );
+      setNextEpisodeData(freshConfig);
+      return;
+    }
+
+    router.push("/pronostics");
+  };
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -202,7 +222,7 @@ export default function DashboardPage() {
                 </div>
 
                 <button
-                onClick={() => router.push("/pronostics")}
+                onClick={handleGoToPronostics}
                 className="bg-purple-600 text-white w-full py-4 rounded-xl font-bold mt-6"
                 >
                 Pronostiquer l&apos;épisode {nextEpisodeData?.numero}

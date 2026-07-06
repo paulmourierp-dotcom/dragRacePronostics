@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
 import { CrownPredictionData } from "@/types/crown";
+import { useToast } from "@/contexts/ToastContext";
 
 interface CrownPredictionModalProps {
   queens: string[];
@@ -14,6 +15,7 @@ export default function CrownPredictionModal({ queens, locked, onClose }: CrownP
   const [queenPredicted, setQueenPredicted] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const showToast = useToast();
 
   useEffect(() => {
     const fetchExisting = async () => {
@@ -41,11 +43,11 @@ export default function CrownPredictionModal({ queens, locked, onClose }: CrownP
         queenPredicted,
         createdAt: Timestamp.now(),
       });
-      alert("Pronostic enregistré !");
+      showToast("Pronostic enregistré !", "success");
       onClose();
     } catch (error) {
       console.error("Erreur :", error);
-      alert("Erreur lors de l'enregistrement.");
+      showToast("Erreur lors de l'enregistrement.", "error");
     } finally {
       setSaving(false);
     }

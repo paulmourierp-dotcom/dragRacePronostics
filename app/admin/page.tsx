@@ -24,6 +24,7 @@ import { normalizeQueens } from "@/lib/queens";
 import { SCORING_RULES } from "@/lib/scoring";
 import Header from "@/components/Header";
 import QueensSelectTable, { QueenChoice } from "@/components/QueensSelectTable";
+import { useToast } from "@/contexts/ToastContext";
 
 interface UserRow extends UserData {
   uid: string;
@@ -114,6 +115,7 @@ export default function AdminPage() {
   };
   const [scoringRules, setScoringRules] = useState<ScoringRules>(defaultScoringRules);
   const [savingResults, setSavingResults] = useState(false);
+  const showToast = useToast();
   const [resultsHistory, setResultsHistory] = useState<ResultData[]>([]);
   const router = useRouter();
 
@@ -169,11 +171,11 @@ export default function AdminPage() {
         queens: newValue
       });
 
-      alert("La liste des Queens a été mise à jour avec succès !");
+      showToast("La liste des Queens a été mise à jour avec succès !", "success");
       setQueensList(newValue);
     } catch (error) {
       console.error("Erreur :", error);
-      alert("Erreur lors de la sauvegarde.");
+      showToast("Erreur lors de la sauvegarde.", "error");
     }
   };
 
@@ -189,13 +191,13 @@ export default function AdminPage() {
       });
       
       // Feedback visuel
-      alert("La liste des Mini-Defis a été mise à jour avec succès !");
-      
+      showToast("La liste des Mini-Defis a été mise à jour avec succès !", "success");
+
       // Optionnel : mettre à jour le state local pour refléter le changement
       setMiniDefisList(newValue);
     } catch (error) {
       console.error("Erreur :", error);
-      alert("Erreur lors de la sauvegarde.");
+      showToast("Erreur lors de la sauvegarde.", "error");
     }
   };
 
@@ -211,13 +213,13 @@ export default function AdminPage() {
       });
       
       // Feedback visuel
-      alert("La liste des Maxi-Defis a été mise à jour avec succès !");
-      
+      showToast("La liste des Maxi-Defis a été mise à jour avec succès !", "success");
+
       // Optionnel : mettre à jour le state local pour refléter le changement
       setMaxiDefisList(newValue);
     } catch (error) {
       console.error("Erreur :", error);
-      alert("Erreur lors de la sauvegarde.");
+      showToast("Erreur lors de la sauvegarde.", "error");
     }
   };
 
@@ -338,10 +340,10 @@ export default function AdminPage() {
         setUsers((prev) => prev.map((u) => (u.uid in newScores ? { ...u, score: newScores[u.uid] } : u)));
       }
 
-      alert("Informations de la couronne enregistrées !");
+      showToast("Informations de la couronne enregistrées !", "success");
     } catch (error) {
       console.error("Erreur :", error);
-      alert("Erreur lors de la sauvegarde.");
+      showToast("Erreur lors de la sauvegarde.", "error");
     }
   };
 
@@ -365,7 +367,7 @@ export default function AdminPage() {
       !resultsMiniDefi ||
       !resultsMaxiDefi
     ) {
-      alert("Remplis entièrement les résultats (2 Top, 2 Bottom, Gagnante, Éliminée, Mini-Défi, Maxi-Défi) avant d'enregistrer.");
+      showToast("Remplis entièrement les résultats (2 Top, 2 Bottom, Gagnante, Éliminée, Mini-Défi, Maxi-Défi) avant d'enregistrer.", "warning");
       return;
     }
 
@@ -414,10 +416,10 @@ export default function AdminPage() {
 
       setUsers((prev) => prev.map((u) => (u.uid in newScores ? { ...u, score: newScores[u.uid] } : u)));
 
-      alert("Résultats enregistrés et scores calculés !");
+      showToast("Résultats enregistrés et scores calculés !", "success");
     } catch (error) {
       console.error("Erreur :", error);
-      alert("Erreur lors de l'enregistrement des résultats.");
+      showToast("Erreur lors de l'enregistrement des résultats.", "error");
     } finally {
       setSavingResults(false);
     }
@@ -433,9 +435,10 @@ export default function AdminPage() {
       // Le formulaire "Résultats" est réinitialisé (ou recharge les résultats déjà saisis
       // pour ce numéro) : il ne doit jamais garder les sélections de l'épisode précédent.
       await loadResultsForEpisode(episodeNum);
-      alert("Épisode mis à jour !");
+      showToast("Épisode mis à jour !", "success");
     } catch (err) {
-      alert("Erreur lors de la mise à jour");
+      console.error("Erreur :", err);
+      showToast("Erreur lors de la mise à jour", "error");
     }
   };
 
