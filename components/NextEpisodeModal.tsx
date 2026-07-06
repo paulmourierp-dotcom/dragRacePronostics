@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Button from "@/components/Button";
 
 interface NextEpisodeModalProps {
   defaultNumero: number;
@@ -59,13 +60,9 @@ export default function NextEpisodeModal({ defaultNumero, defaultDate, onConfirm
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-gray-700 font-bold">
             Plus tard
           </button>
-          <button
-            onClick={handleConfirm}
-            disabled={saving || !date}
-            className="bg-purple-600 text-white font-bold px-4 py-2 rounded-xl disabled:opacity-50"
-          >
+          <Button onClick={handleConfirm} disabled={saving || !date}>
             {saving ? "Enregistrement..." : "Enregistrer"}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -12,6 +12,7 @@ import Image from 'next/image';
 import Header from "@/components/Header";
 import CrownPredictionModal from "@/components/CrownPredictionModal";
 import PlayerDetailsModal from "@/components/PlayerDetailsModal";
+import Button from "@/components/Button";
 import { useToast } from "@/contexts/ToastContext";
 
 const formatDateDiffusion = (timestamp?: Timestamp) =>
@@ -208,7 +209,7 @@ export default function DashboardPage() {
 
         <section className="space-y-6">
             <section className="bg-white p-6 rounded-[15px] shadow-sm border border-gray-100">
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
                   <h2 className="text-xl font-bold text-gray-950">Prochain Épisode</h2>
                   {hasPrediction && (
                     <span className="inline-flex items-center gap-1 text-green-700 bg-green-50 border border-green-200 rounded-full px-3 py-1 text-xs font-semibold">
@@ -217,7 +218,7 @@ export default function DashboardPage() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-6 items-center">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
                     {/* Colonne Gauche : Infos */}
                     <div className="space-y-2">
                         <p className="text-gray-900 font-bold text-lg">Saison 4</p>
@@ -242,22 +243,15 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                <button
-                onClick={handleGoToPronostics}
-                className="bg-purple-600 text-white w-full py-4 rounded-xl font-bold mt-6"
-                >
+                <Button onClick={handleGoToPronostics} size="lg" className="mt-6">
                 Pronostiquer l&apos;épisode {nextEpisodeData?.numero}
-                </button>
+                </Button>
             </section>
 
             <div className="bg-white p-6 rounded shadow text-center rounded-xl">
-                <button
-                onClick={() => setShowCrownModal(true)}
-                disabled={crownLocked}
-                className="bg-purple-600 text-white w-full py-4 rounded font-bold text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
+                <Button onClick={() => setShowCrownModal(true)} disabled={crownLocked} size="lg">
                 {crownLocked ? "Pronostics couronne clos" : "Pronostiquer la gagnante de la saison"}
-                </button>
+                </Button>
             </div>
         </section>
       </div>

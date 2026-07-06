@@ -4,6 +4,7 @@ import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
 import { CrownPredictionData } from "@/types/crown";
 import { useToast } from "@/contexts/ToastContext";
+import Button from "@/components/Button";
 
 interface CrownPredictionModalProps {
   queens: string[];
@@ -84,13 +85,9 @@ export default function CrownPredictionModal({ queens, locked, onClose }: CrownP
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-gray-700 font-bold">
             {locked ? "Fermer" : "Annuler"}
           </button>
-          <button
-            onClick={handleSave}
-            disabled={saving || loading || !queenPredicted || locked}
-            className="bg-purple-600 text-white font-bold px-4 py-2 rounded-xl disabled:opacity-50"
-          >
+          <Button onClick={handleSave} disabled={saving || loading || !queenPredicted || locked}>
             {saving ? "Enregistrement..." : "Sauvegarder"}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfi
 import { auth, db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { doc, setDoc } from "firebase/firestore";
+import Button from "@/components/Button";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -164,13 +165,9 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Bouton de validation (N'oublie pas d'avoir ajouté cursor: pointer dans global.css) */}
-          <button
-            type="submit"
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-purple-500/30 transition duration-150 active:scale-[0.98]"
-          >
+          <Button type="submit" size="lg">
             {isRegistering ? "Créer mon compte" : "Se connecter"}
-          </button>
+          </Button>
         </form>
 
         {/* Lien de bascule (Connexion / Inscription) */}

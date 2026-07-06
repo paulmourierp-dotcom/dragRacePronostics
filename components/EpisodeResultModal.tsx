@@ -1,5 +1,6 @@
 "use client";
 import { ResultData } from "@/types/result";
+import Button from "@/components/Button";
 
 interface EpisodeResultModalProps {
   result: ResultData;
@@ -24,9 +25,7 @@ export default function EpisodeResultModal({ result, onClose }: EpisodeResultMod
         </ul>
 
         <div className="flex justify-end mt-6">
-          <button onClick={onClose} className="bg-purple-600 text-white font-bold px-4 py-2 rounded-xl">
-            Fermer
-          </button>
+          <Button onClick={onClose}>Fermer</Button>
         </div>
       </div>
     </div>

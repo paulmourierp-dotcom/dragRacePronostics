@@ -26,6 +26,7 @@ import Header from "@/components/Header";
 import LoadingScreen from "@/components/LoadingScreen";
 import QueensSelectTable, { QueenChoice } from "@/components/QueensSelectTable";
 import NextEpisodeModal from "@/components/NextEpisodeModal";
+import Button from "@/components/Button";
 import { useToast } from "@/contexts/ToastContext";
 
 interface UserRow extends UserData {
@@ -560,9 +561,9 @@ export default function AdminPage() {
                     Les pronostics se ferment automatiquement à cette date/heure.
                   </p>
                 </div>
-                <button type="submit" className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl hover:bg-purple-700 transition">
+                <Button type="submit" size="lg">
                   Mettre à jour
-                </button>
+                </Button>
               </form>
             </section>
 
@@ -630,12 +631,9 @@ export default function AdminPage() {
               >
                 + Ajouter une Queen
               </button>
-              <button
-                onClick={handleSaveQueens}
-                className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl"
-              >
+              <Button onClick={handleSaveQueens} size="lg">
                 Sauvegarder la liste des Queens
-              </button>
+              </Button>
             </section>
 
             <section className="bg-white/95 p-8 rounded-[15px] shadow-lg">
@@ -646,12 +644,9 @@ export default function AdminPage() {
                 id="miniDefisArea"
                 placeholder="Un Mini-Defi par ligne"
               />
-              <button 
-                onClick={handleSaveMiniDefis}
-                className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl"
-              >
+              <Button onClick={handleSaveMiniDefis} size="lg">
                 Sauvegarder la liste des Mini-Defis
-              </button>
+              </Button>
             </section>
 
             <section className="bg-white/95 p-8 rounded-[15px] shadow-lg">
@@ -662,12 +657,9 @@ export default function AdminPage() {
                 id="maxiDefisArea"
                 placeholder="Un Maxi-Defi par ligne"
               />
-              <button
-                onClick={handleSaveMaxiDefis}
-                className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl"
-              >
+              <Button onClick={handleSaveMaxiDefis} size="lg">
                 Sauvegarder la liste des Maxi-Defis
-              </button>
+              </Button>
             </section>
 
             <section className="bg-white/95 p-8 rounded-[15px] shadow-lg">
@@ -703,12 +695,9 @@ export default function AdminPage() {
                 />
               </div>
 
-              <button
-                onClick={handleSaveCrownWinner}
-                className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl"
-              >
+              <Button onClick={handleSaveCrownWinner} size="lg">
                 Sauvegarder
-              </button>
+              </Button>
               <p className="text-xs text-gray-500 mt-2">
                 La gagnante n&apos;est à renseigner qu&apos;une fois la saison terminée. La case à cocher
                 bloque immédiatement les pronostics couronne des joueurs (ex. dès la diffusion de l&apos;épisode 1),
@@ -835,13 +824,9 @@ export default function AdminPage() {
                 </div>
               )}
 
-              <button
-                onClick={handleSaveResults}
-                disabled={savingResults}
-                className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl mt-4 disabled:opacity-50"
-              >
+              <Button onClick={handleSaveResults} disabled={savingResults} size="lg" className="mt-4">
                 {savingResults ? "Calcul des scores en cours..." : "Enregistrer les résultats et calculer les scores"}
-              </button>
+              </Button>
             </section>
 
             <section className="bg-white/95 p-8 rounded-[15px] shadow-lg md:col-span-2">

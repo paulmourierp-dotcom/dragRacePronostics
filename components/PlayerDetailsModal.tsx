@@ -5,6 +5,7 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { PredictionData } from "@/types/prediction";
 import { ResultData } from "@/types/result";
 import PredictionBreakdown from "@/components/PredictionBreakdown";
+import Button from "@/components/Button";
 
 interface PlayerDetailsModalProps {
   uid: string;
@@ -98,9 +99,7 @@ export default function PlayerDetailsModal({ uid, surnom, rank, onClose }: Playe
         )}
 
         <div className="flex justify-end mt-6">
-          <button onClick={onClose} className="bg-purple-600 text-white font-bold px-4 py-2 rounded-xl">
-            Fermer
-          </button>
+          <Button onClick={onClose}>Fermer</Button>
         </div>
       </div>
     </div>

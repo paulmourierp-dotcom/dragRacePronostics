@@ -6,6 +6,7 @@ import Header from "@/components/Header";
 import LoadingScreen from "@/components/LoadingScreen";
 import EpisodeResultModal from "@/components/EpisodeResultModal";
 import PredictionBreakdown from "@/components/PredictionBreakdown";
+import Button from "@/components/Button";
 import { auth, db } from "@/lib/firebase";
 import { collection, doc, getDoc, getDocs, query, where, Timestamp } from "firebase/firestore";
 import { UserData } from "@/types/user";
@@ -100,12 +101,9 @@ export default function HistoriquePage() {
             <span className="text-sm text-gray-500">En attente des résultats</span>
           )}
           {isStillOpen && (
-            <button
-              onClick={() => router.push("/pronostics")}
-              className="text-sm px-3 py-1 rounded bg-purple-600 text-white font-semibold"
-            >
+            <Button size="sm" onClick={() => router.push("/pronostics")}>
               Modifier
-            </button>
+            </Button>
           )}
           <button
             onClick={() => result && setModalResult(result)}
