@@ -105,7 +105,9 @@ body {
   .app-header button:hover,
   .app-header button:active,
   .app-header [role="button"]:hover,
-  .app-header [role="button"]:active {
+  .app-header [role="button"]:active,
+  #podium button:hover,
+  #podium button:active {
     transform: none !important;
     box-shadow: none !important;
     filter: none !important;
