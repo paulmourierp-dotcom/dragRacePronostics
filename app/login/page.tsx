@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { doc, setDoc } from "firebase/firestore";
@@ -12,12 +12,14 @@ export default function LoginPage() {
   const [surnom, setSurnom] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setMessage("");
 
     try {
       if (isRegistering) {
@@ -61,6 +63,29 @@ export default function LoginPage() {
     }
   };
 
+  const handleForgotPassword = async () => {
+    setError("");
+    setMessage("");
+
+    if (!email.trim()) {
+      setError("Saisissez votre email ci-dessus pour recevoir le lien de réinitialisation.");
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setMessage("Un email de réinitialisation a été envoyé si cette adresse est associée à un compte.");
+    } catch (err: unknown) {
+      console.error(err);
+      if (err && typeof err === "object" && "code" in err && err.code === "auth/invalid-email") {
+        setError("Adresse email invalide.");
+      } else {
+        // On ne révèle pas si l'email existe ou non, pour ne pas divulguer d'informations sur les comptes.
+        setMessage("Un email de réinitialisation a été envoyé si cette adresse est associée à un compte.");
+      }
+    }
+  };
+
   return (
     // Conteneur principal avec l'image de fond et un filtre sombre pour le contraste
     <main
@@ -89,6 +114,13 @@ export default function LoginPage() {
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-sm mb-6 text-center font-medium">
             ⚠️ {error}
+          </div>
+        )}
+
+        {/* Affichage des messages de confirmation */}
+        {message && (
+          <div className="bg-green-50 border border-green-200 text-green-700 p-3 rounded-lg text-sm mb-6 text-center font-medium">
+            ✅ {message}
           </div>
         )}
 
@@ -163,6 +195,17 @@ export default function LoginPage() {
                 )}
               </button>
             </div>
+            {!isRegistering && (
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  className="text-sm text-purple-700 hover:text-purple-900 font-medium transition cursor-pointer"
+                >
+                  Mot de passe oublié ?
+                </button>
+              </div>
+            )}
           </div>
 
           <Button type="submit" size="lg">
@@ -179,6 +222,7 @@ export default function LoginPage() {
             onClick={() => {
               setIsRegistering(!isRegistering);
               setError(""); // Reset de l'erreur lors du changement de mode
+              setMessage("");
             }}
             className="text-purple-700 hover:text-purple-900 font-semibold mt-1 transition"
           >
