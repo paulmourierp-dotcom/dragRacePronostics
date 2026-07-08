@@ -16,8 +16,10 @@ export interface ResultData {
   numero: number;
   top: string[];
   bottom: string[];
-  // Nombre max de Queens autorisées en top/bottom pour cet épisode (figé à la saisie, comme scoringRules).
-  maxTopBottom: number;
+  // Nombre max de Queens autorisées dans le top, resp. le bottom, pour cet épisode
+  // (figé à la saisie, comme scoringRules).
+  maxTop: number;
+  maxBottom: number;
   eliminee: string;
   winner: string;
   miniDefi: string;

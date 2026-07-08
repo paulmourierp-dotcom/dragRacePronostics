@@ -14,7 +14,7 @@ import { UserData } from "@/types/user";
 import { QueenData } from "@/types/gameData";
 import { BonusQuestion } from "@/types/bonus";
 import { normalizeQueens } from "@/lib/queens";
-import { SCORING_RULES, DEFAULT_MAX_TOP_BOTTOM } from "@/lib/scoring";
+import { SCORING_RULES, DEFAULT_MAX_QUEENS } from "@/lib/scoring";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -54,7 +54,8 @@ export default function PronosticPage() {
   const [queens, setQueens] = useState<QueenData[]>([]);
   const [episodeNum, setEpisodeNum] = useState<number | null>(null);
   const [isPastDeadline, setIsPastDeadline] = useState(false);
-  const [maxTopBottom, setMaxTopBottom] = useState(DEFAULT_MAX_TOP_BOTTOM);
+  const [maxTop, setMaxTop] = useState(DEFAULT_MAX_QUEENS);
+  const [maxBottom, setMaxBottom] = useState(DEFAULT_MAX_QUEENS);
   const [miniDefisOptions, setMiniDefisOptions] = useState<string[]>([]);
   const [maxiDefisOptions, setMaxiDefisOptions] = useState<string[]>([]);
 
@@ -92,7 +93,8 @@ export default function PronosticPage() {
         const nextEpisode = nextEpisodeSnap.exists() ? (nextEpisodeSnap.data() as ConfigData) : null;
         const numero = nextEpisode?.numero ?? null;
         setEpisodeNum(numero);
-        setMaxTopBottom(nextEpisode?.maxTopBottom ?? DEFAULT_MAX_TOP_BOTTOM);
+        setMaxTop(nextEpisode?.maxTop ?? DEFAULT_MAX_QUEENS);
+        setMaxBottom(nextEpisode?.maxBottom ?? DEFAULT_MAX_QUEENS);
         setBonusQuestion(nextEpisode?.bonusQuestion ?? null);
         const episodeDate = nextEpisode?.dateDiffusion ? nextEpisode.dateDiffusion.toDate() : null;
         setIsPastDeadline(episodeDate !== null && episodeDate.getTime() < Date.now());
@@ -150,7 +152,7 @@ export default function PronosticPage() {
     // sélectionnée comme "top" (les deux statuts sont mutuellement exclusifs).
     setTopQueens((prev) => prev.filter((q) => !next.includes(q)));
     setEliminee((prev) => (prev && next.includes(prev) ? prev : null));
-    if (next.length === maxTopBottom) advanceSoon();
+    if (next.length === maxBottom) advanceSoon();
   };
 
   const handleElimineeChange = (next: string[]) => {
@@ -163,7 +165,7 @@ export default function PronosticPage() {
     setTopQueens(next);
     // Une Queen retirée du top ne peut plus rester "gagnante".
     setWinner((prev) => (prev && next.includes(prev) ? prev : null));
-    if (next.length === maxTopBottom) advanceSoon();
+    if (next.length === maxTop) advanceSoon();
   };
 
   const handleWinnerChange = (next: string[]) => {
@@ -274,12 +276,12 @@ export default function PronosticPage() {
                 totalSteps={totalSteps}
                 title="Qui sera dans le bottom ?"
                 points={SCORING_RULES.bottom}
-                multiplier={maxTopBottom}
+                multiplier={maxBottom}
               />
               <p className="text-sm text-gray-500 mb-3">
-                Sélectionne de 0 à {maxTopBottom} Queens, puis clique sur Suivant.
+                Sélectionne de 0 à {maxBottom} Queens, puis clique sur Suivant.
               </p>
-              <QueenGrid queens={activeQueens} selected={bottomQueens} max={maxTopBottom} onChange={handleBottomChange} />
+              <QueenGrid queens={activeQueens} selected={bottomQueens} max={maxBottom} onChange={handleBottomChange} />
               <div className="mt-4 text-right">
                 <Button size="sm" onClick={goNext}>Suivant →</Button>
               </div>
@@ -322,16 +324,16 @@ export default function PronosticPage() {
                 totalSteps={totalSteps}
                 title="Qui sera dans le top ?"
                 points={SCORING_RULES.top}
-                multiplier={maxTopBottom}
+                multiplier={maxTop}
                 onBack={goBack}
               />
               <p className="text-sm text-gray-500 mb-3">
-                Sélectionne de 0 à {maxTopBottom} Queens, puis clique sur Suivant.
+                Sélectionne de 0 à {maxTop} Queens, puis clique sur Suivant.
               </p>
               <QueenGrid
                 queens={activeQueens}
                 selected={topQueens}
-                max={maxTopBottom}
+                max={maxTop}
                 disabledTags={topDisabledTags}
                 onChange={handleTopChange}
               />

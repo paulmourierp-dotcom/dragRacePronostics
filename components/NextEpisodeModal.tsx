@@ -5,27 +5,30 @@ import Button from "@/components/Button";
 interface NextEpisodeModalProps {
   defaultNumero: number;
   defaultDate: string;
-  defaultMaxTopBottom: number;
-  onConfirm: (numero: number, date: string, maxTopBottom: number) => Promise<void> | void;
+  defaultMaxTop: number;
+  defaultMaxBottom: number;
+  onConfirm: (numero: number, date: string, maxTop: number, maxBottom: number) => Promise<void> | void;
   onClose: () => void;
 }
 
 export default function NextEpisodeModal({
   defaultNumero,
   defaultDate,
-  defaultMaxTopBottom,
+  defaultMaxTop,
+  defaultMaxBottom,
   onConfirm,
   onClose,
 }: NextEpisodeModalProps) {
   const [numero, setNumero] = useState(defaultNumero);
   const [date, setDate] = useState(defaultDate);
-  const [maxTopBottom, setMaxTopBottom] = useState(defaultMaxTopBottom);
+  const [maxTop, setMaxTop] = useState(defaultMaxTop);
+  const [maxBottom, setMaxBottom] = useState(defaultMaxBottom);
   const [saving, setSaving] = useState(false);
 
   const handleConfirm = async () => {
     setSaving(true);
     try {
-      await onConfirm(numero, date, maxTopBottom);
+      await onConfirm(numero, date, maxTop, maxBottom);
     } finally {
       setSaving(false);
     }
@@ -62,20 +65,33 @@ export default function NextEpisodeModal({
               Pré-remplie à +7 jours par défaut (finale, rediffusion... modifie librement).
             </p>
           </div>
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Max Queens en top/bottom</label>
-            <select
-              value={maxTopBottom}
-              onChange={(e) => setMaxTopBottom(Number(e.target.value))}
-              className="w-full p-3 rounded-xl border border-gray-200 text-gray-900"
-            >
-              <option value={2}>2</option>
-              <option value={3}>3</option>
-            </select>
-            <p className="text-xs text-gray-500 mt-1">
-              Passe à 2 pour les derniers épisodes de la saison.
-            </p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Max Queens en top</label>
+              <select
+                value={maxTop}
+                onChange={(e) => setMaxTop(Number(e.target.value))}
+                className="w-full p-3 rounded-xl border border-gray-200 text-gray-900"
+              >
+                <option value={2}>2</option>
+                <option value={3}>3</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Max Queens en bottom</label>
+              <select
+                value={maxBottom}
+                onChange={(e) => setMaxBottom(Number(e.target.value))}
+                className="w-full p-3 rounded-xl border border-gray-200 text-gray-900"
+              >
+                <option value={2}>2</option>
+                <option value={3}>3</option>
+              </select>
+            </div>
           </div>
+          <p className="text-xs text-gray-500 -mt-2">
+            Passe à 2 pour les derniers épisodes de la saison.
+          </p>
         </div>
 
         <div className="flex gap-2 justify-end mt-6">
