@@ -14,8 +14,10 @@ export interface ScoringRules {
 // Document Firestore : results/{numero} — résultats officiels d'un épisode, saisis par l'admin
 export interface ResultData {
   numero: number;
-  top: [string, string];
-  bottom: [string, string];
+  top: string[];
+  bottom: string[];
+  // Nombre max de Queens autorisées en top/bottom pour cet épisode (figé à la saisie, comme scoringRules).
+  maxTopBottom: number;
   eliminee: string;
   winner: string;
   miniDefi: string;

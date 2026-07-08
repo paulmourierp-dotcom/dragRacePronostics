@@ -14,7 +14,7 @@ import { UserData } from "@/types/user";
 import { QueenData } from "@/types/gameData";
 import { BonusQuestion } from "@/types/bonus";
 import { normalizeQueens } from "@/lib/queens";
-import { SCORING_RULES } from "@/lib/scoring";
+import { SCORING_RULES, DEFAULT_MAX_TOP_BOTTOM } from "@/lib/scoring";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -54,6 +54,7 @@ export default function PronosticPage() {
   const [queens, setQueens] = useState<QueenData[]>([]);
   const [episodeNum, setEpisodeNum] = useState<number | null>(null);
   const [isPastDeadline, setIsPastDeadline] = useState(false);
+  const [maxTopBottom, setMaxTopBottom] = useState(DEFAULT_MAX_TOP_BOTTOM);
   const [miniDefisOptions, setMiniDefisOptions] = useState<string[]>([]);
   const [maxiDefisOptions, setMaxiDefisOptions] = useState<string[]>([]);
 
@@ -91,6 +92,7 @@ export default function PronosticPage() {
         const nextEpisode = nextEpisodeSnap.exists() ? (nextEpisodeSnap.data() as ConfigData) : null;
         const numero = nextEpisode?.numero ?? null;
         setEpisodeNum(numero);
+        setMaxTopBottom(nextEpisode?.maxTopBottom ?? DEFAULT_MAX_TOP_BOTTOM);
         setBonusQuestion(nextEpisode?.bonusQuestion ?? null);
         const episodeDate = nextEpisode?.dateDiffusion ? nextEpisode.dateDiffusion.toDate() : null;
         setIsPastDeadline(episodeDate !== null && episodeDate.getTime() < Date.now());
@@ -148,7 +150,7 @@ export default function PronosticPage() {
     // sélectionnée comme "top" (les deux statuts sont mutuellement exclusifs).
     setTopQueens((prev) => prev.filter((q) => !next.includes(q)));
     setEliminee((prev) => (prev && next.includes(prev) ? prev : null));
-    if (next.length === 2) advanceSoon();
+    if (next.length === maxTopBottom) advanceSoon();
   };
 
   const handleElimineeChange = (next: string[]) => {
@@ -161,7 +163,7 @@ export default function PronosticPage() {
     setTopQueens(next);
     // Une Queen retirée du top ne peut plus rester "gagnante".
     setWinner((prev) => (prev && next.includes(prev) ? prev : null));
-    if (next.length === 2) advanceSoon();
+    if (next.length === maxTopBottom) advanceSoon();
   };
 
   const handleWinnerChange = (next: string[]) => {
@@ -272,14 +274,15 @@ export default function PronosticPage() {
                 totalSteps={totalSteps}
                 title="Qui sera dans le bottom ?"
                 points={SCORING_RULES.bottom}
-                multiplier={2}
+                multiplier={maxTopBottom}
               />
-              <QueenGrid queens={activeQueens} selected={bottomQueens} max={2} onChange={handleBottomChange} />
-              {bottomQueens.length === 2 && (
-                <div className="mt-4 text-right">
-                  <Button size="sm" onClick={goNext}>Suivant →</Button>
-                </div>
-              )}
+              <p className="text-sm text-gray-500 mb-3">
+                Sélectionne de 0 à {maxTopBottom} Queens, puis clique sur Suivant.
+              </p>
+              <QueenGrid queens={activeQueens} selected={bottomQueens} max={maxTopBottom} onChange={handleBottomChange} />
+              <div className="mt-4 text-right">
+                <Button size="sm" onClick={goNext}>Suivant →</Button>
+              </div>
             </>
           )}
 
@@ -292,13 +295,19 @@ export default function PronosticPage() {
                 points={SCORING_RULES.eliminee}
                 onBack={goBack}
               />
-              <QueenGrid
-                queens={bottomQueens}
-                selected={eliminee ? [eliminee] : []}
-                max={1}
-                onChange={handleElimineeChange}
-              />
-              {eliminee && (
+              {bottomQueens.length === 0 ? (
+                <p className="text-sm text-gray-500 bg-gray-100 rounded-xl p-4">
+                  Aucune Queen sélectionnée dans le bottom.
+                </p>
+              ) : (
+                <QueenGrid
+                  queens={bottomQueens}
+                  selected={eliminee ? [eliminee] : []}
+                  max={1}
+                  onChange={handleElimineeChange}
+                />
+              )}
+              {(bottomQueens.length === 0 || eliminee) && (
                 <div className="mt-4 text-right">
                   <Button size="sm" onClick={goNext}>Suivant →</Button>
                 </div>
@@ -313,21 +322,22 @@ export default function PronosticPage() {
                 totalSteps={totalSteps}
                 title="Qui sera dans le top ?"
                 points={SCORING_RULES.top}
-                multiplier={2}
+                multiplier={maxTopBottom}
                 onBack={goBack}
               />
+              <p className="text-sm text-gray-500 mb-3">
+                Sélectionne de 0 à {maxTopBottom} Queens, puis clique sur Suivant.
+              </p>
               <QueenGrid
                 queens={activeQueens}
                 selected={topQueens}
-                max={2}
+                max={maxTopBottom}
                 disabledTags={topDisabledTags}
                 onChange={handleTopChange}
               />
-              {topQueens.length === 2 && (
-                <div className="mt-4 text-right">
-                  <Button size="sm" onClick={goNext}>Suivant →</Button>
-                </div>
-              )}
+              <div className="mt-4 text-right">
+                <Button size="sm" onClick={goNext}>Suivant →</Button>
+              </div>
             </>
           )}
 
@@ -340,13 +350,19 @@ export default function PronosticPage() {
                 points={SCORING_RULES.gagnante}
                 onBack={goBack}
               />
-              <QueenGrid
-                queens={topQueens}
-                selected={winner ? [winner] : []}
-                max={1}
-                onChange={handleWinnerChange}
-              />
-              {winner && (
+              {topQueens.length === 0 ? (
+                <p className="text-sm text-gray-500 bg-gray-100 rounded-xl p-4">
+                  Aucune Queen sélectionnée dans le top.
+                </p>
+              ) : (
+                <QueenGrid
+                  queens={topQueens}
+                  selected={winner ? [winner] : []}
+                  max={1}
+                  onChange={handleWinnerChange}
+                />
+              )}
+              {(topQueens.length === 0 || winner) && (
                 <div className="mt-4 text-right">
                   <Button size="sm" onClick={goNext}>Suivant →</Button>
                 </div>

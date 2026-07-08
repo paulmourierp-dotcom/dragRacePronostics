@@ -23,15 +23,18 @@ import { ResultData, ScoringRules } from "@/types/result";
 import { CrownPredictionData } from "@/types/crown";
 import { BonusQuestion } from "@/types/bonus";
 import { normalizeQueens } from "@/lib/queens";
-import { SCORING_RULES } from "@/lib/scoring";
+import { SCORING_RULES, DEFAULT_MAX_TOP_BOTTOM } from "@/lib/scoring";
 import { normalizeAnswer } from "@/lib/textNormalize";
 import Header from "@/components/Header";
 import LoadingScreen from "@/components/LoadingScreen";
-import QueensSelectTable, { QueenChoice } from "@/components/QueensSelectTable";
 import NextEpisodeModal from "@/components/NextEpisodeModal";
 import BonusQuestionEditor from "@/components/BonusQuestionEditor";
 import Button from "@/components/Button";
+import QueenGrid from "@/components/pronostics/QueenGrid";
+import DefiOptions from "@/components/pronostics/DefiOptions";
 import { useToast } from "@/contexts/ToastContext";
+
+type QueenChoice = "top" | "bottom" | "safe";
 
 interface BonusReviewEntry {
   uid: string;
@@ -120,6 +123,8 @@ export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [episodeNum, setEpisodeNum] = useState(1);
   const [dateDiffusion, setDateDiffusion] = useState("");
+  const [maxTopBottom, setMaxTopBottom] = useState(DEFAULT_MAX_TOP_BOTTOM);
+  const [resultsMaxTopBottom, setResultsMaxTopBottom] = useState(DEFAULT_MAX_TOP_BOTTOM);
   const [queensList, setQueensList] = useState<QueenData[]>([]);
   const [miniDefisList, setMiniDefisList] = useState<string[]>([]);
   const [maxiDefisList, setMaxiDefisList] = useState<string[]>([]);
@@ -165,7 +170,11 @@ export default function AdminPage() {
   // (nouvel épisode : aucune Queen ni barème hérité de l'épisode précédent).
   // `pendingBonusQuestion` : question bonus telle que configurée dans config/next_episode, utilisée
   // uniquement quand l'épisode demandé n'a pas encore de résultats publiés (sinon on lit results/{numero}).
-  const loadResultsForEpisode = async (numero: number, pendingBonusQuestion: BonusQuestion | null = null) => {
+  const loadResultsForEpisode = async (
+    numero: number,
+    pendingBonusQuestion: BonusQuestion | null = null,
+    pendingMaxTopBottom: number = maxTopBottom
+  ) => {
     setResultsEpisodeNum(numero);
     const resultDoc = await getDoc(doc(db, "results", String(numero)));
     if (resultDoc.exists()) {
@@ -179,6 +188,7 @@ export default function AdminPage() {
       setResultsMiniDefi(data.miniDefi);
       setResultsMaxiDefi(data.maxiDefi);
       setScoringRules(data.scoringRules || defaultScoringRules);
+      setResultsMaxTopBottom(data.maxTopBottom ?? DEFAULT_MAX_TOP_BOTTOM);
       setResultsBonusQuestion(data.bonusQuestion ?? null);
       setResultsBonusAnswer(data.bonusQuestion?.answer ?? "");
 
@@ -205,6 +215,7 @@ export default function AdminPage() {
       setResultsMiniDefi(null);
       setResultsMaxiDefi(null);
       setScoringRules(defaultScoringRules);
+      setResultsMaxTopBottom(pendingMaxTopBottom);
       setResultsBonusQuestion(pendingBonusQuestion);
       setResultsBonusAnswer("");
       setBonusReview([]);
@@ -306,6 +317,9 @@ export default function AdminPage() {
         const loadedBonusQuestion: BonusQuestion | null = configDoc.exists()
           ? configDoc.data().bonusQuestion ?? null
           : null;
+        const loadedMaxTopBottom: number = configDoc.exists()
+          ? configDoc.data().maxTopBottom ?? DEFAULT_MAX_TOP_BOTTOM
+          : DEFAULT_MAX_TOP_BOTTOM;
         if (configDoc.exists()) {
           setEpisodeNum(numero as number);
           const ts = configDoc.data().dateDiffusion as Timestamp | undefined;
@@ -313,6 +327,7 @@ export default function AdminPage() {
         }
         setBonusQuestion(loadedBonusQuestion);
         setBonusQuestionEpisodeNum(numero);
+        setMaxTopBottom(loadedMaxTopBottom);
 
         const listsSnap = await getDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9"));
         if (listsSnap.exists()) {
@@ -332,7 +347,7 @@ export default function AdminPage() {
 
         // Résultats déjà saisis pour l'épisode en cours (pour édition/correction)
         if (numero !== null) {
-          await loadResultsForEpisode(numero, loadedBonusQuestion);
+          await loadResultsForEpisode(numero, loadedBonusQuestion, loadedMaxTopBottom);
         }
 
         // Historique de tous les résultats déjà publiés (pour la partie non modifiable)
@@ -441,24 +456,49 @@ export default function AdminPage() {
     .map((q) => q.name);
   const resultsTopQueens = resultsActiveQueens.filter((q) => resultsQueensStatus[q] === "top");
   const resultsBottomQueens = resultsActiveQueens.filter((q) => resultsQueensStatus[q] === "bottom");
-  const resultsAllSelected = resultsTopQueens.length === 2 && resultsBottomQueens.length === 2;
+  const resultsAllSelected = resultsTopQueens.length > 0 && resultsBottomQueens.length > 0;
+  const resultsTopDisabledTags = Object.fromEntries(resultsBottomQueens.map((q) => [q, "Bottom"]));
+  const resultsBottomDisabledTags = Object.fromEntries(resultsTopQueens.map((q) => [q, "Top"]));
 
-  const handleResultsQueenChange = (queen: string, value: QueenChoice) => {
-    setResultsQueensStatus((prev) => ({ ...prev, [queen]: value }));
-    if (resultsWinner === queen && value !== "top") setResultsWinner(null);
-    if (resultsEliminee === queen && value !== "bottom") setResultsEliminee(null);
+  const handleResultsBottomChange = (next: string[]) => {
+    setResultsQueensStatus((prev) => {
+      const updated = { ...prev };
+      resultsActiveQueens.forEach((q) => {
+        if (updated[q] === "bottom") delete updated[q];
+      });
+      next.forEach((q) => { updated[q] = "bottom"; });
+      return updated;
+    });
+    setResultsEliminee((prev) => (prev && next.includes(prev) ? prev : null));
+  };
+
+  const handleResultsTopChange = (next: string[]) => {
+    setResultsQueensStatus((prev) => {
+      const updated = { ...prev };
+      resultsActiveQueens.forEach((q) => {
+        if (updated[q] === "top") delete updated[q];
+      });
+      next.forEach((q) => { updated[q] = "top"; });
+      return updated;
+    });
+    setResultsWinner((prev) => (prev && next.includes(prev) ? prev : null));
   };
 
   const handleSaveResults = async () => {
     if (
-      resultsTopQueens.length !== 2 ||
-      resultsBottomQueens.length !== 2 ||
+      resultsTopQueens.length < 1 ||
+      resultsTopQueens.length > resultsMaxTopBottom ||
+      resultsBottomQueens.length < 1 ||
+      resultsBottomQueens.length > resultsMaxTopBottom ||
       !resultsWinner ||
       !resultsEliminee ||
       !resultsMiniDefi ||
       !resultsMaxiDefi
     ) {
-      showToast("Remplis entièrement les résultats (2 Top, 2 Bottom, Gagnante, Éliminée, Mini-Défi, Maxi-Défi) avant d'enregistrer.", "warning");
+      showToast(
+        `Remplis entièrement les résultats (1 à ${resultsMaxTopBottom} Top, 1 à ${resultsMaxTopBottom} Bottom, Gagnante, Éliminée, Mini-Défi, Maxi-Défi) avant d'enregistrer.`,
+        "warning"
+      );
       return;
     }
 
@@ -468,8 +508,9 @@ export default function AdminPage() {
     try {
       const resultData: ResultData = {
         numero: resultsEpisodeNum,
-        top: [resultsTopQueens[0], resultsTopQueens[1]],
-        bottom: [resultsBottomQueens[0], resultsBottomQueens[1]],
+        top: resultsTopQueens,
+        bottom: resultsBottomQueens,
+        maxTopBottom: resultsMaxTopBottom,
         eliminee: resultsEliminee,
         winner: resultsWinner,
         miniDefi: resultsMiniDefi,
@@ -566,7 +607,7 @@ export default function AdminPage() {
     loadResultsForEpisode(numero);
   };
 
-  const handleConfirmNextEpisode = async (numero: number, date: string) => {
+  const handleConfirmNextEpisode = async (numero: number, date: string, newMaxTopBottom: number) => {
     try {
       // config/next_episode est un doc unique réutilisé d'un épisode à l'autre : la question
       // bonus de l'épisode précédent (déjà figée dans results/{numero}) ne doit pas "fuiter"
@@ -575,15 +616,17 @@ export default function AdminPage() {
       await updateDoc(doc(db, "config", "next_episode"), {
         numero,
         dateDiffusion: Timestamp.fromDate(new Date(date)),
+        maxTopBottom: newMaxTopBottom,
         ...(numeroChanged ? { bonusQuestion: deleteField() } : {}),
       });
       setEpisodeNum(numero);
       setDateDiffusion(date);
+      setMaxTopBottom(newMaxTopBottom);
       if (numeroChanged) {
         setBonusQuestion(null);
         setBonusQuestionEpisodeNum(numero);
       }
-      await loadResultsForEpisode(numero, numeroChanged ? null : bonusQuestion);
+      await loadResultsForEpisode(numero, numeroChanged ? null : bonusQuestion, newMaxTopBottom);
       setShowNextEpisodeModal(false);
       showToast("Prochain épisode enregistré !", "success");
     } catch (error) {
@@ -599,6 +642,7 @@ export default function AdminPage() {
       await updateDoc(doc(db, "config", "next_episode"), {
         numero: episodeNum,
         dateDiffusion: Timestamp.fromDate(new Date(dateDiffusion)),
+        maxTopBottom,
         ...(numeroChanged ? { bonusQuestion: deleteField() } : {}),
       });
       if (numeroChanged) {
@@ -707,9 +751,9 @@ export default function AdminPage() {
     <>
       <Header isAdmin={isAdmin} />
       <div className="min-h-screen bg-cover bg-center" style={{ backgroundImage: "url('/fond-login.png')" }}>
-        <div className="min-h-screen bg-gray-950/80 backdrop-blur-sm p-6 md:p-12">
-          
-          <h1 className="text-4xl font-bold text-white mb-10 text-center">Administration</h1>
+        <div className="min-h-screen bg-gray-950/80 backdrop-blur-sm p-4 sm:p-6 md:p-12">
+
+          <h1 className="text-2xl sm:text-4xl font-bold text-white mb-10 text-center">Administration</h1>
 
           <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-8">
             
@@ -736,6 +780,20 @@ export default function AdminPage() {
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     Les pronostics se ferment automatiquement à cette date/heure.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Max Queens en top/bottom</label>
+                  <select
+                    value={maxTopBottom}
+                    onChange={(e) => setMaxTopBottom(Number(e.target.value))}
+                    className="w-full p-3 rounded-xl border border-gray-200 text-gray-900"
+                  >
+                    <option value={2}>2</option>
+                    <option value={3}>3</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Passe à 2 pour les derniers épisodes de la saison.
                   </p>
                 </div>
                 <Button type="submit" size="lg">
@@ -892,12 +950,12 @@ export default function AdminPage() {
             </section>
 
             <section className="bg-white/95 p-8 rounded-[15px] shadow-lg md:col-span-2">
-              <div className="flex justify-between items-center mb-2">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
                 <h2 className="text-2xl font-bold text-gray-950">Résultats de l&apos;épisode {resultsEpisodeNum}</h2>
                 {resultsEpisodeNum !== episodeNum && (
                   <button
                     onClick={() => loadResultsForEpisode(episodeNum, bonusQuestion)}
-                    className="text-sm px-3 py-1 rounded border border-gray-200 text-gray-700 font-semibold"
+                    className="text-sm px-3 py-1 rounded border border-gray-200 text-gray-700 font-semibold self-start sm:self-auto"
                   >
                     Revenir à l&apos;épisode en cours ({episodeNum})
                   </button>
@@ -913,15 +971,35 @@ export default function AdminPage() {
                 )}
               </p>
 
-              <QueensSelectTable
-                queens={resultsActiveQueens}
-                values={resultsQueensStatus}
-                onChange={handleResultsQueenChange}
-              />
+              <div className="mb-4">
+                <p className="text-sm font-bold text-gray-700 mb-2">
+                  Bottom (1 à {resultsMaxTopBottom} Queens)
+                </p>
+                <QueenGrid
+                  queens={resultsActiveQueens}
+                  selected={resultsBottomQueens}
+                  max={resultsMaxTopBottom}
+                  disabledTags={resultsBottomDisabledTags}
+                  onChange={handleResultsBottomChange}
+                />
+              </div>
+
+              <div className="mb-4">
+                <p className="text-sm font-bold text-gray-700 mb-2">
+                  Top (1 à {resultsMaxTopBottom} Queens)
+                </p>
+                <QueenGrid
+                  queens={resultsActiveQueens}
+                  selected={resultsTopQueens}
+                  max={resultsMaxTopBottom}
+                  disabledTags={resultsTopDisabledTags}
+                  onChange={handleResultsTopChange}
+                />
+              </div>
 
               <div className="mt-4">
                 <p className="text-sm font-bold text-gray-700 mb-2">Barème de points pour cet épisode</p>
-                <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
                   {(
                     [
                       ["top", "Top"],
@@ -948,64 +1026,44 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Mini-Défi</label>
-                  <select
-                    value={resultsMiniDefi || ""}
-                    onChange={(e) => setResultsMiniDefi(e.target.value || null)}
-                    className="w-full p-2 rounded-lg border border-gray-200 text-gray-900"
-                  >
-                    <option value="">--</option>
-                    {miniDefisList.map((option) => (
-                      <option key={option} value={option}>{option}</option>
-                    ))}
-                    <option value="Autre">Autre</option>
-                  </select>
+                  <DefiOptions
+                    options={miniDefisList}
+                    value={resultsMiniDefi}
+                    onSelect={(value) => setResultsMiniDefi(value)}
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Maxi-Défi</label>
-                  <select
-                    value={resultsMaxiDefi || ""}
-                    onChange={(e) => setResultsMaxiDefi(e.target.value || null)}
-                    className="w-full p-2 rounded-lg border border-gray-200 text-gray-900"
-                  >
-                    <option value="">--</option>
-                    {maxiDefisList.map((option) => (
-                      <option key={option} value={option}>{option}</option>
-                    ))}
-                    <option value="Autre">Autre</option>
-                  </select>
+                  <DefiOptions
+                    options={maxiDefisList}
+                    value={resultsMaxiDefi}
+                    onSelect={(value) => setResultsMaxiDefi(value)}
+                  />
                 </div>
               </div>
 
               {resultsAllSelected && (
-                <div className="grid grid-cols-2 gap-4 mt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                   <div>
                     <label className="block text-sm font-bold text-gray-700 mb-1">Gagnante (parmi le Top)</label>
-                    <select
-                      value={resultsWinner || ""}
-                      onChange={(e) => setResultsWinner(e.target.value || null)}
-                      className="w-full p-2 rounded-lg border border-gray-200 text-gray-900"
-                    >
-                      <option value="">--</option>
-                      {resultsTopQueens.map((q) => (
-                        <option key={q} value={q}>{q}</option>
-                      ))}
-                    </select>
+                    <QueenGrid
+                      queens={resultsTopQueens}
+                      selected={resultsWinner ? [resultsWinner] : []}
+                      max={1}
+                      onChange={(next) => setResultsWinner(next[0] ?? null)}
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-gray-700 mb-1">Éliminée (parmi le Bottom)</label>
-                    <select
-                      value={resultsEliminee || ""}
-                      onChange={(e) => setResultsEliminee(e.target.value || null)}
-                      className="w-full p-2 rounded-lg border border-gray-200 text-gray-900"
-                    >
-                      <option value="">--</option>
-                      {resultsBottomQueens.map((q) => (
-                        <option key={q} value={q}>{q}</option>
-                      ))}
-                    </select>
+                    <QueenGrid
+                      queens={resultsBottomQueens}
+                      selected={resultsEliminee ? [resultsEliminee] : []}
+                      max={1}
+                      onChange={(next) => setResultsEliminee(next[0] ?? null)}
+                    />
                   </div>
                 </div>
               )}
@@ -1148,6 +1206,7 @@ export default function AdminPage() {
         <NextEpisodeModal
           defaultNumero={nextEpisodeDraftNum}
           defaultDate={nextEpisodeDraftDate}
+          defaultMaxTopBottom={maxTopBottom}
           onConfirm={handleConfirmNextEpisode}
           onClose={() => setShowNextEpisodeModal(false)}
         />

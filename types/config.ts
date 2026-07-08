@@ -6,4 +6,6 @@ export interface ConfigData {
   dateDiffusion: Timestamp;
   // Question bonus de l'épisode `numero`, définie par l'admin. Absente tant qu'aucune n'a été créée.
   bonusQuestion?: BonusQuestion;
+  // Nombre max de Queens sélectionnables en top/bottom (2 ou 3). Absent = DEFAULT_MAX_TOP_BOTTOM.
+  maxTopBottom?: number;
 }

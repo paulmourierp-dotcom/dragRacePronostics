@@ -76,21 +76,19 @@ body {
     cursor: pointer;
   }
 
-  /* Petit effet "vrai bouton" au survol/clic sur tous les boutons de l'app */
-  button:not(:disabled),
-  [role="button"] {
+  /* Effet "vrai bouton" au survol/clic, réservé aux boutons primaires (violets) via .btn-elevated.
+     Les autres boutons/liens gardent uniquement leurs transitions de couleur/underline habituelles. */
+  .btn-elevated:not(:disabled) {
     transition: transform 0.12s ease-out, box-shadow 0.12s ease-out, filter 0.12s ease-out;
   }
 
-  button:not(:disabled):hover,
-  [role="button"]:hover {
+  .btn-elevated:not(:disabled):hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
     filter: brightness(1.05);
   }
 
-  button:not(:disabled):active,
-  [role="button"]:active {
+  .btn-elevated:not(:disabled):active {
     transform: translateY(0) scale(0.96);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
     filter: brightness(0.95);
@@ -98,23 +96,6 @@ body {
 
   button:disabled {
     cursor: not-allowed;
-  }
-
-  /* Le Header a ses propres boutons de nav discrets : pas d'effet "vrai bouton" ici */
-  .app-header button,
-  .app-header [role="button"], #podium button {
-    transition: none;
-  }
-
-  .app-header button:hover,
-  .app-header button:active,
-  .app-header [role="button"]:hover,
-  .app-header [role="button"]:active,
-  #podium button:hover,
-  #podium button:active {
-    transform: none !important;
-    box-shadow: none !important;
-    filter: none !important;
   }
 }
 
