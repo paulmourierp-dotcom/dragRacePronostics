@@ -7,11 +7,13 @@ import { useRouter } from "next/navigation";
 import { UserData } from "@/types/user"; // Ajuste le chemin selon ton dossier
 import { ConfigData } from "@/types/config"; // Ajuste le chemin selon ton dossier
 import { CrownResultData } from "@/types/crown";
+import { PredictionData } from "@/types/prediction";
 import { normalizeQueens } from "@/lib/queens";
 import Image from 'next/image';
 import Header from "@/components/Header";
 import CrownPredictionModal from "@/components/CrownPredictionModal";
 import PlayerDetailsModal from "@/components/PlayerDetailsModal";
+import PendingActionsModal, { PendingActionItem } from "@/components/PendingActionsModal";
 import Button from "@/components/Button";
 import { useToast } from "@/contexts/ToastContext";
 
@@ -55,6 +57,8 @@ export default function DashboardPage() {
   const [queens, setQueens] = useState<string[]>([]);
   const [crownLocked, setCrownLocked] = useState(false);
   const [showCrownModal, setShowCrownModal] = useState(false);
+  const [pendingItems, setPendingItems] = useState<PendingActionItem[]>([]);
+  const [showPendingModal, setShowPendingModal] = useState(false);
   const showToast = useToast();
 
     useEffect(() => {
@@ -94,9 +98,11 @@ export default function DashboardPage() {
             }
 
             // 3bis. Savoir si j'ai déjà un pronostic enregistré pour cet épisode
+            let myPrediction: PredictionData | null = null;
             if (nextEpisode?.numero != null) {
             const predictionSnap = await getDoc(doc(db, "predictions", `${user.uid}_ep${nextEpisode.numero}`));
             setHasPrediction(predictionSnap.exists());
+            if (predictionSnap.exists()) myPrediction = predictionSnap.data() as PredictionData;
             } else {
             setHasPrediction(false);
             }
@@ -110,11 +116,65 @@ export default function DashboardPage() {
             setQueens(activeQueens);
             }
 
-            // 5. Savoir si les pronostics couronne sont verrouillés par l'admin
-            const crownResultSnap = await getDoc(doc(db, "config", "crown_result"));
+            // 5. Savoir si les pronostics couronne sont verrouillés par l'admin, et si j'en ai déjà fait un
+            const [crownResultSnap, crownPredictionSnap] = await Promise.all([
+              getDoc(doc(db, "config", "crown_result")),
+              getDoc(doc(db, "crownPredictions", user.uid)),
+            ]);
+            let isCrownLocked = false;
             if (crownResultSnap.exists()) {
-            setCrownLocked((crownResultSnap.data() as CrownResultData).locked ?? false);
+              isCrownLocked = (crownResultSnap.data() as CrownResultData).locked ?? false;
+              setCrownLocked(isCrownLocked);
             }
+
+            // 6. Rappels : question bonus réinitialisée, nouvel épisode à pronostiquer, couronne manquante.
+            const items: PendingActionItem[] = [];
+
+            if (myPrediction?.bonusAnswerPending) {
+              items.push({
+                key: "bonus",
+                title: "Question bonus à refaire",
+                description: `L'administrateur a modifié la question bonus de l'épisode ${nextEpisode?.numero}, ta réponse a été réinitialisée.`,
+                actionLabel: "Répondre à la question bonus",
+                onAction: () => router.push("/pronostics"),
+              });
+            }
+
+            if (nextEpisode?.numero != null && !myPrediction) {
+              let description = `Pronostique l'épisode ${nextEpisode.numero} avant sa diffusion.`;
+              if (nextEpisode.numero > 1) {
+                const previousPredSnap = await getDoc(
+                  doc(db, "predictions", `${user.uid}_ep${nextEpisode.numero - 1}`)
+                );
+                if (previousPredSnap.exists()) {
+                  const previousPoints = (previousPredSnap.data() as PredictionData).pointsEarned ?? 0;
+                  description = `L'épisode ${nextEpisode.numero - 1} est terminé, tu as obtenu ${previousPoints} points ! Pronostique l'épisode ${nextEpisode.numero} avant sa diffusion.`;
+                }
+              }
+              items.push({
+                key: "episode",
+                title: "Nouvel épisode à pronostiquer",
+                description,
+                actionLabel: `Pronostiquer l'épisode ${nextEpisode.numero}`,
+                onAction: () => router.push("/pronostics"),
+              });
+            }
+
+            if (!isCrownLocked && !crownPredictionSnap.exists()) {
+              items.push({
+                key: "crown",
+                title: "Pronostic de la gagnante manquant",
+                description: "Tu n'as pas encore pronostiqué la gagnante de la saison.",
+                actionLabel: "Pronostiquer la gagnante",
+                onAction: () => {
+                  setShowPendingModal(false);
+                  setShowCrownModal(true);
+                },
+              });
+            }
+
+            setPendingItems(items);
+            setShowPendingModal(items.length > 0);
           } catch (error) {
             console.error("Erreur :", error);
           }
@@ -271,6 +331,10 @@ export default function DashboardPage() {
           rank={selectedPlayer.rank}
           onClose={() => setSelectedPlayer(null)}
         />
+      )}
+
+      {showPendingModal && pendingItems.length > 0 && (
+        <PendingActionsModal items={pendingItems} onClose={() => setShowPendingModal(false)} />
       )}
     </main>
   );

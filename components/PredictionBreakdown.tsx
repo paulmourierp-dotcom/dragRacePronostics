@@ -102,6 +102,16 @@ export default function PredictionBreakdown({ prediction, result }: PredictionBr
           correct={result ? prediction.maxiDefi === result.maxiDefi : null}
         />
       </div>
+
+      {result?.bonusQuestion && (
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <GuessRow
+            label={`${result.bonusQuestion.question} (bonus, ${result.bonusQuestion.points} pts)`}
+            guess={prediction.bonusAnswer ?? null}
+            correct={prediction.bonusAnswer != null ? Boolean(prediction.bonusCorrect) : null}
+          />
+        </div>
+      )}
     </>
   );
 }

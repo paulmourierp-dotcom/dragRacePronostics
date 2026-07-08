@@ -6,11 +6,13 @@ import Button from "@/components/Button";
 import QueenGrid from "@/components/pronostics/QueenGrid";
 import DefiOptions from "@/components/pronostics/DefiOptions";
 import StepHeader from "@/components/pronostics/StepHeader";
+import BonusQuestionStep from "@/components/pronostics/BonusQuestionStep";
 import { auth, db } from "@/lib/firebase";
 import { ConfigData } from "@/types/config";
 import { PredictionData } from "@/types/prediction";
 import { UserData } from "@/types/user";
 import { QueenData } from "@/types/gameData";
+import { BonusQuestion } from "@/types/bonus";
 import { normalizeQueens } from "@/lib/queens";
 import { SCORING_RULES } from "@/lib/scoring";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -24,8 +26,8 @@ const STEP_TOP = 3;
 const STEP_WINNER = 4;
 const STEP_MINI = 5;
 const STEP_MAXI = 6;
-const STEP_RECAP = 7;
-const TOTAL_STEPS = 6;
+const STEP_BONUS = 7;
+const STEP_RECAP = 8;
 
 interface RecapRowProps {
   label: string;
@@ -62,6 +64,9 @@ export default function PronosticPage() {
   const [winner, setWinner] = useState<string | null>(null);
   const [miniDefi, setMiniDefi] = useState<string | null>(null);
   const [maxiDefi, setMaxiDefi] = useState<string | null>(null);
+  const [bonusQuestion, setBonusQuestion] = useState<BonusQuestion | null>(null);
+  const [bonusAnswer, setBonusAnswer] = useState<string | null>(null);
+  const totalSteps = bonusQuestion ? 7 : 6;
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -86,6 +91,7 @@ export default function PronosticPage() {
         const nextEpisode = nextEpisodeSnap.exists() ? (nextEpisodeSnap.data() as ConfigData) : null;
         const numero = nextEpisode?.numero ?? null;
         setEpisodeNum(numero);
+        setBonusQuestion(nextEpisode?.bonusQuestion ?? null);
         const episodeDate = nextEpisode?.dateDiffusion ? nextEpisode.dateDiffusion.toDate() : null;
         setIsPastDeadline(episodeDate !== null && episodeDate.getTime() < Date.now());
 
@@ -107,6 +113,7 @@ export default function PronosticPage() {
             setEliminee(data.eliminee ?? null);
             setMiniDefi(data.miniDefi ?? null);
             setMaxiDefi(data.maxiDefi ?? null);
+            setBonusAnswer(data.bonusAnswerPending ? null : data.bonusAnswer ?? null);
             setStep(STEP_RECAP);
           }
         }
@@ -122,9 +129,18 @@ export default function PronosticPage() {
 
   const activeQueens = queens.filter((q) => !q.eliminee).map((q) => q.name);
 
-  const goNext = () => setStep((s) => Math.min(s + 1, STEP_RECAP));
-  const goBack = () => setStep((s) => Math.max(s - 1, STEP_BOTTOM));
-  const advanceSoon = () => setTimeout(() => setStep((s) => Math.min(s + 1, STEP_RECAP)), 350);
+  // L'étape bonus n'existe que si l'épisode en a une : on la saute dans les deux sens.
+  const computeNextStep = (s: number) => {
+    const next = s + 1 === STEP_BONUS && !bonusQuestion ? STEP_RECAP : s + 1;
+    return Math.min(next, STEP_RECAP);
+  };
+  const computePrevStep = (s: number) => {
+    const prev = s - 1 === STEP_BONUS && !bonusQuestion ? STEP_MAXI : s - 1;
+    return Math.max(prev, STEP_BOTTOM);
+  };
+  const goNext = () => setStep(computeNextStep);
+  const goBack = () => setStep(computePrevStep);
+  const advanceSoon = () => setTimeout(() => setStep(computeNextStep), 350);
 
   const handleBottomChange = (next: string[]) => {
     setBottomQueens(next);
@@ -164,6 +180,11 @@ export default function PronosticPage() {
     advanceSoon();
   };
 
+  const handleBonusSelect = (value: string) => {
+    setBonusAnswer(value);
+    advanceSoon();
+  };
+
   const topDisabledTags = Object.fromEntries(
     bottomQueens.map((q) => [q, q === eliminee ? "Éliminée" : "Bottom"])
   );
@@ -189,6 +210,7 @@ export default function PronosticPage() {
           eliminee,
           miniDefi,
           maxiDefi,
+          ...(bonusQuestion ? { bonusAnswer, bonusAnswerPending: false } : {}),
           updatedAt: new Date(),
         },
         { merge: true }
@@ -247,7 +269,7 @@ export default function PronosticPage() {
             <>
               <StepHeader
                 step={STEP_BOTTOM}
-                totalSteps={TOTAL_STEPS}
+                totalSteps={totalSteps}
                 title="Qui sera dans le bottom ?"
                 points={SCORING_RULES.bottom}
                 multiplier={2}
@@ -265,7 +287,7 @@ export default function PronosticPage() {
             <>
               <StepHeader
                 step={STEP_ELIMINEE}
-                totalSteps={TOTAL_STEPS}
+                totalSteps={totalSteps}
                 title="Qui sera éliminée ?"
                 points={SCORING_RULES.eliminee}
                 onBack={goBack}
@@ -288,7 +310,7 @@ export default function PronosticPage() {
             <>
               <StepHeader
                 step={STEP_TOP}
-                totalSteps={TOTAL_STEPS}
+                totalSteps={totalSteps}
                 title="Qui sera dans le top ?"
                 points={SCORING_RULES.top}
                 multiplier={2}
@@ -313,7 +335,7 @@ export default function PronosticPage() {
             <>
               <StepHeader
                 step={STEP_WINNER}
-                totalSteps={TOTAL_STEPS}
+                totalSteps={totalSteps}
                 title="Qui sera la gagnante de l'épisode ?"
                 points={SCORING_RULES.gagnante}
                 onBack={goBack}
@@ -336,7 +358,7 @@ export default function PronosticPage() {
             <>
               <StepHeader
                 step={STEP_MINI}
-                totalSteps={TOTAL_STEPS}
+                totalSteps={totalSteps}
                 title="Quel sera le mini-défi ?"
                 points={SCORING_RULES.miniDefi}
                 onBack={goBack}
@@ -354,13 +376,36 @@ export default function PronosticPage() {
             <>
               <StepHeader
                 step={STEP_MAXI}
-                totalSteps={TOTAL_STEPS}
+                totalSteps={totalSteps}
                 title="Quel sera le maxi-défi ?"
                 points={SCORING_RULES.maxiDefi}
                 onBack={goBack}
               />
               <DefiOptions options={maxiDefisOptions} value={maxiDefi} onSelect={handleMaxiDefiSelect} />
               {maxiDefi && (
+                <div className="mt-4 text-right">
+                  <Button size="sm" onClick={goNext}>
+                    {bonusQuestion ? "Suivant →" : "Voir le récapitulatif →"}
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+
+          {step === STEP_BONUS && bonusQuestion && (
+            <>
+              <div className="mb-4 text-center text-purple-700 font-bold">
+                🎉 Et maintenant... la question bonus !
+              </div>
+              <StepHeader
+                step={STEP_BONUS}
+                totalSteps={totalSteps}
+                title={bonusQuestion.question}
+                points={bonusQuestion.points}
+                onBack={goBack}
+              />
+              <BonusQuestionStep bonusQuestion={bonusQuestion} value={bonusAnswer} onSelect={handleBonusSelect} />
+              {bonusAnswer && (
                 <div className="mt-4 text-right">
                   <Button size="sm" onClick={goNext}>Voir le récapitulatif →</Button>
                 </div>
@@ -371,7 +416,10 @@ export default function PronosticPage() {
           {step === STEP_RECAP && (
             <>
               <div className="flex items-center justify-between mb-6">
-                <button onClick={() => setStep(STEP_MAXI)} className="text-sm text-gray-500 font-semibold">
+                <button
+                  onClick={() => setStep(computePrevStep(STEP_RECAP))}
+                  className="text-sm text-gray-500 font-semibold"
+                >
                   ← Retour
                 </button>
                 <h1 className="text-2xl font-bold text-gray-900">Récapitulatif</h1>
@@ -385,6 +433,13 @@ export default function PronosticPage() {
                 <RecapRow label="Gagnante" value={winner ?? "-"} onEdit={() => setStep(STEP_WINNER)} />
                 <RecapRow label="Mini-défi" value={miniDefi ?? "-"} onEdit={() => setStep(STEP_MINI)} />
                 <RecapRow label="Maxi-défi" value={maxiDefi ?? "-"} onEdit={() => setStep(STEP_MAXI)} />
+                {bonusQuestion && (
+                  <RecapRow
+                    label={bonusQuestion.question}
+                    value={bonusAnswer ?? "-"}
+                    onEdit={() => setStep(STEP_BONUS)}
+                  />
+                )}
               </div>
 
               <div className="mt-8">

@@ -6,6 +6,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  deleteField,
   collection,
   getDocs,
   query,
@@ -20,14 +21,24 @@ import { QueenData } from "@/types/gameData";
 import { PredictionData } from "@/types/prediction";
 import { ResultData, ScoringRules } from "@/types/result";
 import { CrownPredictionData } from "@/types/crown";
+import { BonusQuestion } from "@/types/bonus";
 import { normalizeQueens } from "@/lib/queens";
 import { SCORING_RULES } from "@/lib/scoring";
+import { normalizeAnswer } from "@/lib/textNormalize";
 import Header from "@/components/Header";
 import LoadingScreen from "@/components/LoadingScreen";
 import QueensSelectTable, { QueenChoice } from "@/components/QueensSelectTable";
 import NextEpisodeModal from "@/components/NextEpisodeModal";
+import BonusQuestionEditor from "@/components/BonusQuestionEditor";
 import Button from "@/components/Button";
 import { useToast } from "@/contexts/ToastContext";
+
+interface BonusReviewEntry {
+  uid: string;
+  surnom: string;
+  answer: string;
+  correct: boolean;
+}
 
 interface UserRow extends UserData {
   uid: string;
@@ -74,6 +85,16 @@ const computeEpisodePoints = (
   return points;
 };
 
+// Compare la réponse bonus du joueur à la réponse gagnante (normalisée, pour tolérer les
+// petites variantes de saisie en texte libre). Le résultat de "correct" reste modifiable
+// manuellement par l'admin ensuite (cas d'une faute d'orthographe qu'on veut quand même valider).
+const computeBonusPoints = (prediction: PredictionData, result: ResultData): { points: number; correct: boolean } => {
+  const bonus = result.bonusQuestion;
+  if (!bonus || prediction.bonusAnswer == null) return { points: 0, correct: false };
+  const correct = normalizeAnswer(prediction.bonusAnswer) === normalizeAnswer(bonus.answer);
+  return { points: correct ? bonus.points : 0, correct };
+};
+
 // Recalcule le score total d'un joueur = somme de tous ses pointsEarned
 // (pronostics d'épisodes + pronostic couronne), et le persiste sur users/{uid}.score.
 const recomputeUserScore = async (uid: string): Promise<number> => {
@@ -111,6 +132,13 @@ export default function AdminPage() {
   const [resultsEliminee, setResultsEliminee] = useState<string | null>(null);
   const [resultsMiniDefi, setResultsMiniDefi] = useState<string | null>(null);
   const [resultsMaxiDefi, setResultsMaxiDefi] = useState<string | null>(null);
+  const [bonusQuestion, setBonusQuestion] = useState<BonusQuestion | null>(null);
+  // Épisode auquel appartient `bonusQuestion` : permet de savoir s'il faut la réinitialiser
+  // quand on avance vers un nouvel épisode (config/next_episode est un doc unique réutilisé).
+  const [bonusQuestionEpisodeNum, setBonusQuestionEpisodeNum] = useState<number | null>(null);
+  const [resultsBonusQuestion, setResultsBonusQuestion] = useState<BonusQuestion | null>(null);
+  const [resultsBonusAnswer, setResultsBonusAnswer] = useState("");
+  const [bonusReview, setBonusReview] = useState<BonusReviewEntry[]>([]);
   const defaultScoringRules: ScoringRules = {
     top: SCORING_RULES.top,
     bottom: SCORING_RULES.bottom,
@@ -135,7 +163,9 @@ export default function AdminPage() {
   // Recharge le formulaire "Résultats de l'épisode" pour un numéro donné : reprend les
   // résultats déjà saisis s'ils existent (édition), sinon repart d'un formulaire vierge
   // (nouvel épisode : aucune Queen ni barème hérité de l'épisode précédent).
-  const loadResultsForEpisode = async (numero: number) => {
+  // `pendingBonusQuestion` : question bonus telle que configurée dans config/next_episode, utilisée
+  // uniquement quand l'épisode demandé n'a pas encore de résultats publiés (sinon on lit results/{numero}).
+  const loadResultsForEpisode = async (numero: number, pendingBonusQuestion: BonusQuestion | null = null) => {
     setResultsEpisodeNum(numero);
     const resultDoc = await getDoc(doc(db, "results", String(numero)));
     if (resultDoc.exists()) {
@@ -149,6 +179,25 @@ export default function AdminPage() {
       setResultsMiniDefi(data.miniDefi);
       setResultsMaxiDefi(data.maxiDefi);
       setScoringRules(data.scoringRules || defaultScoringRules);
+      setResultsBonusQuestion(data.bonusQuestion ?? null);
+      setResultsBonusAnswer(data.bonusQuestion?.answer ?? "");
+
+      if (data.bonusQuestion?.type === "texte") {
+        const predsSnap = await getDocs(query(collection(db, "predictions"), where("episodeId", "==", numero)));
+        const review: BonusReviewEntry[] = predsSnap.docs
+          .map((d) => d.data() as PredictionData)
+          .filter((p): p is PredictionData & { bonusAnswer: string } => Boolean(p.bonusAnswer))
+          .map((p) => ({
+            uid: p.userId,
+            surnom: users.find((u) => u.uid === p.userId)?.surnom ?? p.userId,
+            answer: p.bonusAnswer,
+            correct: Boolean(p.bonusCorrect),
+          }))
+          .sort((a, b) => Number(a.correct) - Number(b.correct));
+        setBonusReview(review);
+      } else {
+        setBonusReview([]);
+      }
     } else {
       setResultsQueensStatus({});
       setResultsWinner(null);
@@ -156,6 +205,9 @@ export default function AdminPage() {
       setResultsMiniDefi(null);
       setResultsMaxiDefi(null);
       setScoringRules(defaultScoringRules);
+      setResultsBonusQuestion(pendingBonusQuestion);
+      setResultsBonusAnswer("");
+      setBonusReview([]);
     }
   };
 
@@ -251,11 +303,16 @@ export default function AdminPage() {
         // Charger les données initiales
         const configDoc = await getDoc(doc(db, "config", "next_episode"));
         const numero: number | null = configDoc.exists() ? configDoc.data().numero : null;
+        const loadedBonusQuestion: BonusQuestion | null = configDoc.exists()
+          ? configDoc.data().bonusQuestion ?? null
+          : null;
         if (configDoc.exists()) {
           setEpisodeNum(numero as number);
           const ts = configDoc.data().dateDiffusion as Timestamp | undefined;
           if (ts) setDateDiffusion(toDatetimeLocalValue(ts));
         }
+        setBonusQuestion(loadedBonusQuestion);
+        setBonusQuestionEpisodeNum(numero);
 
         const listsSnap = await getDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9"));
         if (listsSnap.exists()) {
@@ -275,7 +332,7 @@ export default function AdminPage() {
 
         // Résultats déjà saisis pour l'épisode en cours (pour édition/correction)
         if (numero !== null) {
-          await loadResultsForEpisode(numero);
+          await loadResultsForEpisode(numero, loadedBonusQuestion);
         }
 
         // Historique de tous les résultats déjà publiés (pour la partie non modifiable)
@@ -419,6 +476,9 @@ export default function AdminPage() {
         maxiDefi: resultsMaxiDefi,
         scoringRules,
         publishedAt: Timestamp.now(),
+        ...(resultsBonusQuestion
+          ? { bonusQuestion: { ...resultsBonusQuestion, answer: resultsBonusAnswer || "Aucune" } }
+          : {}),
       };
 
       // Repart de zéro pour cet épisode : si on corrige une erreur (l'éliminée a changé),
@@ -440,16 +500,33 @@ export default function AdminPage() {
         query(collection(db, "predictions"), where("episodeId", "==", resultsEpisodeNum))
       );
       const affectedUserIds = new Set<string>();
+      const bonusReviewCandidates: BonusReviewEntry[] = [];
       predsSnap.forEach((predDoc) => {
         const prediction = predDoc.data() as PredictionData;
-        const points = computeEpisodePoints(prediction, resultData, resultsActiveQueens);
-        batch.update(predDoc.ref, { pointsEarned: points });
+        const basePoints = computeEpisodePoints(prediction, resultData, resultsActiveQueens);
+        const bonus = computeBonusPoints(prediction, resultData);
+        const update: Record<string, unknown> = {
+          pointsEarned: basePoints + bonus.points,
+          bonusAnswerPending: false,
+        };
+        if (resultData.bonusQuestion) update.bonusCorrect = bonus.correct;
+        batch.update(predDoc.ref, update);
         affectedUserIds.add(prediction.userId);
+
+        if (resultData.bonusQuestion?.type === "texte" && prediction.bonusAnswer) {
+          bonusReviewCandidates.push({
+            uid: prediction.userId,
+            surnom: users.find((u) => u.uid === prediction.userId)?.surnom ?? prediction.userId,
+            answer: prediction.bonusAnswer,
+            correct: bonus.correct,
+          });
+        }
       });
 
       await batch.commit();
       setQueensList(updatedQueensList);
       setResultsHistory((prev) => [resultData, ...prev.filter((r) => r.numero !== resultsEpisodeNum)]);
+      setBonusReview(bonusReviewCandidates.sort((a, b) => Number(a.correct) - Number(b.correct)));
 
       // Recalcule le score total de chaque joueur concerné (couvre aussi bien un nouvel
       // épisode qu'une correction d'un épisode passé : l'erreur est humaine, ça peut arriver).
@@ -491,13 +568,22 @@ export default function AdminPage() {
 
   const handleConfirmNextEpisode = async (numero: number, date: string) => {
     try {
+      // config/next_episode est un doc unique réutilisé d'un épisode à l'autre : la question
+      // bonus de l'épisode précédent (déjà figée dans results/{numero}) ne doit pas "fuiter"
+      // sur le nouvel épisode.
+      const numeroChanged = bonusQuestionEpisodeNum !== null && bonusQuestionEpisodeNum !== numero;
       await updateDoc(doc(db, "config", "next_episode"), {
         numero,
         dateDiffusion: Timestamp.fromDate(new Date(date)),
+        ...(numeroChanged ? { bonusQuestion: deleteField() } : {}),
       });
       setEpisodeNum(numero);
       setDateDiffusion(date);
-      await loadResultsForEpisode(numero);
+      if (numeroChanged) {
+        setBonusQuestion(null);
+        setBonusQuestionEpisodeNum(numero);
+      }
+      await loadResultsForEpisode(numero, numeroChanged ? null : bonusQuestion);
       setShowNextEpisodeModal(false);
       showToast("Prochain épisode enregistré !", "success");
     } catch (error) {
@@ -509,17 +595,108 @@ export default function AdminPage() {
   const handleUpdateEpisode = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const numeroChanged = bonusQuestionEpisodeNum !== null && bonusQuestionEpisodeNum !== episodeNum;
       await updateDoc(doc(db, "config", "next_episode"), {
         numero: episodeNum,
-        dateDiffusion: Timestamp.fromDate(new Date(dateDiffusion))
+        dateDiffusion: Timestamp.fromDate(new Date(dateDiffusion)),
+        ...(numeroChanged ? { bonusQuestion: deleteField() } : {}),
       });
+      if (numeroChanged) {
+        setBonusQuestion(null);
+        setBonusQuestionEpisodeNum(episodeNum);
+      }
       // Le formulaire "Résultats" est réinitialisé (ou recharge les résultats déjà saisis
       // pour ce numéro) : il ne doit jamais garder les sélections de l'épisode précédent.
-      await loadResultsForEpisode(episodeNum);
+      await loadResultsForEpisode(episodeNum, numeroChanged ? null : bonusQuestion);
       showToast("Épisode mis à jour !", "success");
     } catch (err) {
       console.error("Erreur :", err);
       showToast("Erreur lors de la mise à jour", "error");
+    }
+  };
+
+  const handleSaveBonusQuestion = async (next: BonusQuestion) => {
+    const predsSnap = await getDocs(
+      query(collection(db, "predictions"), where("episodeId", "==", episodeNum))
+    );
+    const answered = predsSnap.docs.filter((d) => (d.data() as PredictionData).bonusAnswer != null);
+
+    if (answered.length > 0) {
+      const confirmed = window.confirm(
+        `${answered.length} joueur(s) ont déjà répondu à la question bonus actuelle. La modifier va réinitialiser leur réponse : ils devront y répondre à nouveau. Confirmer ?`
+      );
+      if (!confirmed) return;
+    }
+
+    try {
+      await updateDoc(doc(db, "config", "next_episode"), { bonusQuestion: next });
+      if (answered.length > 0) {
+        const batch = writeBatch(db);
+        answered.forEach((d) => batch.update(d.ref, { bonusAnswer: deleteField(), bonusAnswerPending: true }));
+        await batch.commit();
+      }
+      setBonusQuestion(next);
+      setBonusQuestionEpisodeNum(episodeNum);
+      if (resultsEpisodeNum === episodeNum) setResultsBonusQuestion(next);
+      showToast("Question bonus enregistrée !", "success");
+    } catch (error) {
+      console.error("Erreur :", error);
+      showToast("Erreur lors de la sauvegarde de la question bonus.", "error");
+    }
+  };
+
+  const handleRemoveBonusQuestion = async () => {
+    const predsSnap = await getDocs(
+      query(collection(db, "predictions"), where("episodeId", "==", episodeNum))
+    );
+    const answered = predsSnap.docs.filter((d) => (d.data() as PredictionData).bonusAnswer != null);
+
+    if (answered.length > 0) {
+      const confirmed = window.confirm(
+        `${answered.length} joueur(s) ont déjà répondu à la question bonus. La retirer effacera leur réponse. Confirmer ?`
+      );
+      if (!confirmed) return;
+    }
+
+    try {
+      await updateDoc(doc(db, "config", "next_episode"), { bonusQuestion: deleteField() });
+      if (answered.length > 0) {
+        const batch = writeBatch(db);
+        answered.forEach((d) => batch.update(d.ref, { bonusAnswer: deleteField(), bonusAnswerPending: false }));
+        await batch.commit();
+      }
+      setBonusQuestion(null);
+      setBonusQuestionEpisodeNum(episodeNum);
+      if (resultsEpisodeNum === episodeNum) setResultsBonusQuestion(null);
+      showToast("Question bonus retirée.", "success");
+    } catch (error) {
+      console.error("Erreur :", error);
+      showToast("Erreur lors de la suppression de la question bonus.", "error");
+    }
+  };
+
+  // Correction manuelle d'une réponse en texte libre non reconnue automatiquement
+  // (faute d'orthographe...). Recalcule pointsEarned de ce joueur puis son score total.
+  const handleToggleBonusCorrect = async (uid: string, correct: boolean) => {
+    const result = resultsHistory.find((r) => r.numero === resultsEpisodeNum);
+    if (!result?.bonusQuestion) return;
+
+    const predRef = doc(db, "predictions", `${uid}_ep${resultsEpisodeNum}`);
+    const predSnap = await getDoc(predRef);
+    if (!predSnap.exists()) return;
+    const prediction = predSnap.data() as PredictionData;
+
+    const basePoints = computeEpisodePoints(prediction, result, resultsActiveQueens);
+    const bonusPoints = correct ? result.bonusQuestion.points : 0;
+
+    try {
+      await updateDoc(predRef, { bonusCorrect: correct, pointsEarned: basePoints + bonusPoints });
+      const newScore = await recomputeUserScore(uid);
+      setUsers((prev) => prev.map((u) => (u.uid === uid ? { ...u, score: newScore } : u)));
+      setBonusReview((prev) => prev.map((r) => (r.uid === uid ? { ...r, correct } : r)));
+    } catch (error) {
+      console.error("Erreur :", error);
+      showToast("Erreur lors de la mise à jour de la réponse.", "error");
     }
   };
 
@@ -593,6 +770,15 @@ export default function AdminPage() {
                 </table>
               </div>
             </section>
+
+            <BonusQuestionEditor
+              key={bonusQuestionEpisodeNum ?? episodeNum}
+              episodeNum={episodeNum}
+              initial={bonusQuestion}
+              queensList={queensList}
+              onSave={handleSaveBonusQuestion}
+              onRemove={handleRemoveBonusQuestion}
+            />
 
             <section className="bg-white/95 p-8 rounded-[15px] shadow-lg">
               <h2 className="text-2xl font-bold text-gray-950 mb-4">Gestion des Queens</h2>
@@ -710,7 +896,7 @@ export default function AdminPage() {
                 <h2 className="text-2xl font-bold text-gray-950">Résultats de l&apos;épisode {resultsEpisodeNum}</h2>
                 {resultsEpisodeNum !== episodeNum && (
                   <button
-                    onClick={() => loadResultsForEpisode(episodeNum)}
+                    onClick={() => loadResultsForEpisode(episodeNum, bonusQuestion)}
                     className="text-sm px-3 py-1 rounded border border-gray-200 text-gray-700 font-semibold"
                   >
                     Revenir à l&apos;épisode en cours ({episodeNum})
@@ -820,6 +1006,79 @@ export default function AdminPage() {
                         <option key={q} value={q}>{q}</option>
                       ))}
                     </select>
+                  </div>
+                </div>
+              )}
+
+              {resultsBonusQuestion && (
+                <div className="mt-4 bg-purple-50 border border-purple-100 rounded-xl p-4">
+                  <p className="text-sm font-bold text-gray-700 mb-1">
+                    Question bonus : {resultsBonusQuestion.question}
+                  </p>
+                  <p className="text-xs text-gray-500 mb-2">
+                    {resultsBonusQuestion.points} points pour une bonne réponse.
+                  </p>
+
+                  {resultsBonusQuestion.type === "queens" && (
+                    <select
+                      value={resultsBonusAnswer || "Aucune"}
+                      onChange={(e) => setResultsBonusAnswer(e.target.value)}
+                      className="w-full p-2 rounded-lg border border-gray-200 text-gray-900"
+                    >
+                      {[...(resultsBonusQuestion.queensOptions ?? []), "Aucune"].map((q) => (
+                        <option key={q} value={q}>{q}</option>
+                      ))}
+                    </select>
+                  )}
+
+                  {resultsBonusQuestion.type === "options" && (
+                    <select
+                      value={resultsBonusAnswer || "Aucune"}
+                      onChange={(e) => setResultsBonusAnswer(e.target.value)}
+                      className="w-full p-2 rounded-lg border border-gray-200 text-gray-900"
+                    >
+                      {(resultsBonusQuestion.options ?? ["Aucune"]).map((o) => (
+                        <option key={o} value={o}>{o}</option>
+                      ))}
+                    </select>
+                  )}
+
+                  {resultsBonusQuestion.type === "texte" && (
+                    <input
+                      type="text"
+                      value={resultsBonusAnswer}
+                      onChange={(e) => setResultsBonusAnswer(e.target.value)}
+                      placeholder="Réponse correcte de référence (ou laisse vide si aucune réponse ne gagne)"
+                      className="w-full p-2 rounded-lg border border-gray-200 text-gray-900"
+                    />
+                  )}
+                </div>
+              )}
+
+              {bonusReview.length > 0 && (
+                <div className="mt-4 border-t border-gray-100 pt-4">
+                  <p className="text-sm font-bold text-gray-700 mb-2">
+                    Réponses en texte libre à la question bonus — vérifie celles non reconnues automatiquement
+                  </p>
+                  <div className="space-y-2">
+                    {bonusReview.map((r) => (
+                      <div key={r.uid} className="flex items-center justify-between gap-2 bg-gray-50 rounded-lg p-2">
+                        <div className="text-sm">
+                          <span className="font-semibold text-gray-900">{r.surnom}</span>
+                          <span className="text-gray-600"> — &quot;{r.answer}&quot;</span>
+                        </div>
+                        <button
+                          onClick={() => handleToggleBonusCorrect(r.uid, !r.correct)}
+                          className={`text-xs px-3 py-1 rounded border font-semibold whitespace-nowrap ${
+                            r.correct
+                              ? "border-green-300 bg-green-50 text-green-700"
+                              : "border-gray-200 text-gray-700"
+                          }`}
+                        >
+                          {r.correct ? "✓ Marquée correcte" : "Marquer correcte"}
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

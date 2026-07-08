@@ -1,4 +1,5 @@
 import { Timestamp } from "firebase/firestore";
+import { BonusResult } from "./bonus";
 
 export interface ScoringRules {
   top: number;
@@ -22,4 +23,6 @@ export interface ResultData {
   // Barème utilisé pour calculer pointsEarned de cet épisode, modifiable épisode par épisode
   scoringRules: ScoringRules;
   publishedAt: Timestamp;
+  // Question bonus figée au moment de la saisie des résultats (copiée depuis config/next_episode).
+  bonusQuestion?: BonusResult;
 }
