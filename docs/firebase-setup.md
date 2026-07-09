@@ -13,8 +13,9 @@ Ce document décrit ce qu'il faut configurer manuellement dans la console Fireba
 | `predictions/{uid}_ep{numero}` | user | auto-créé au 1er `setDoc` | Pronostics hebdo d'un joueur pour un épisode |
 | `results/{numero}` | admin | auto-créé au 1er `setDoc` | Résultats officiels d'un épisode (fait foi pour le score) |
 | `crownPredictions/{uid}` | user | auto-créé au 1er `setDoc` | Pronostic saison ("qui gagnera la couronne") |
+| `queenRatings/{uid}_ep{numero}` | user | auto-créé au 1er `setDoc` | Notes subjectives (0-10) d'un joueur sur chaque Queen d'un épisode donné — purement informatif, n'affecte jamais `pointsEarned`/`score` |
 
-Point important : Firestore est schemaless. Tu n'as **rien à créer dans la console** pour `predictions`, `results`, `crownPredictions` et `config/crown_result` — ces documents apparaissent tout seuls dès le premier `setDoc`/`addDoc` exécuté par l'app (le panel `/admin` a maintenant une section "Gagnante de la saison" qui fait un `setDoc` sur `config/crown_result`). Seul `config/next_episode` doit être créé à la main, car rien dans le code ne l'initialise (l'app ne fait que le lire/mettre à jour).
+Point important : Firestore est schemaless. Tu n'as **rien à créer dans la console** pour `predictions`, `results`, `crownPredictions`, `queenRatings` et `config/crown_result` — ces documents apparaissent tout seuls dès le premier `setDoc`/`addDoc` exécuté par l'app (le panel `/admin` a maintenant une section "Gagnante de la saison" qui fait un `setDoc` sur `config/crown_result`). Seul `config/next_episode` doit être créé à la main, car rien dans le code ne l'initialise (l'app ne fait que le lire/mettre à jour).
 
 ## 2. Documents à créer manuellement (Firestore > Data)
 
@@ -79,6 +80,15 @@ winner?: string               // renseigné uniquement une fois la saison termin
 publishedAt?: Timestamp
 ```
 
+**`queenRatings/{uid}_ep{numero}`** (`types/rating.ts`, `QueenRatingData`)
+```
+userId: string
+episodeId: number
+ratings: { [nomQueen]: number }   // note entière 0-10, une entrée par Queen notée
+updatedAt: Timestamp
+```
+S'ouvre dès que `results/{numero}` existe (résultats publiés par l'admin) — pas de verrou de deadline ensuite, modifiable à volonté contrairement à `predictions`. Une notation partielle (toutes les Queens de l'épisode pas encore notées) est acceptée et persistée, mais ne compte pas comme "complète" pour la checklist utilisateur (dashboard) ni pour la colonne "Notation effectuée" de `/admin` — voir `lib/rating.ts#isRatingComplete`, qui s'appuie sur `lib/episodeRoster.ts#activeQueensAtEpisode` pour connaître le roster attendu à cet épisode. La moyenne communautaire par Queen/épisode (`lib/rating.ts#communityAverage`) est recalculée côté client à partir de la collection entière, comme le reste de l'app (pas de Cloud Function).
+
 ## 4. Règles de sécurité Firestore
 
 À coller dans **Firestore Database > Rules** dans la console. Ce bloc part de ce que le code actuel présuppose (users peuvent lire tout le monde pour le classement, admin identifié par `users/{uid}.role == "admin"`) et intègre la règle de deadline sur `predictions` restée en attente depuis le passage de `dateDiffusion` en Timestamp.
@@ -138,6 +148,23 @@ service cloud.firestore {
         get(/databases/$(database)/documents/config/crown_result).data.locked == true
       );
     }
+
+    match /queenRatings/{ratingId} {
+      // Lecture ouverte à tout utilisateur connecté (pas seulement le propriétaire) : la moyenne
+      // communautaire par Queen/épisode est recalculée côté client à partir de la collection
+      // entière, comme le reste de l'app — il faut donc pouvoir lire les notations des autres.
+      allow read: if isSignedIn();
+
+      // Un joueur ne peut créer/modifier que sa propre notation, et seulement une fois les
+      // résultats de l'épisode concerné publiés (results/{episodeId} doit exister) — pas de
+      // verrou de deadline ensuite, contrairement à predictions (modifiable à tout moment).
+      // L'admin peut toujours écrire.
+      allow create, update: if isSignedIn() && (
+        isAdmin() ||
+        (request.resource.data.userId == request.auth.uid &&
+         exists(/databases/$(database)/documents/results/$(string(request.resource.data.episodeId))))
+      );
+    }
   }
 }
 ```
@@ -152,4 +179,4 @@ Rien à créer à l'avance. Si tu ajoutes plus tard une requête combinant un fi
 
 1. Coller les règles de sécurité ci-dessus (§4) dans la console.
 2. Vérifier/créer `config/next_episode` (déjà fait).
-3. Ne rien créer pour `results`, `predictions`, `crownPredictions`, `config/crown_result` — l'app s'en charge au premier écrit (le dernier, une fois la saison terminée, via le panel `/admin`).
+3. Ne rien créer pour `results`, `predictions`, `crownPredictions`, `queenRatings`, `config/crown_result` — l'app s'en charge au premier écrit (le dernier, une fois la saison terminée, via le panel `/admin`).

@@ -37,10 +37,20 @@
 import { useEffect, useState, ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
+import { Space_Grotesk } from "next/font/google";
 import { auth } from "@/lib/firebase";
 import { ToastProvider } from "@/contexts/ToastContext";
 import LoadingScreen from "@/components/LoadingScreen";
 import "./globals.css";
+
+// Space Grotesk ne fournit pas d'instance statique 800 sur Google Fonts (max 700) — les
+// classes Tailwind font-extrabold (800) restent utilisées dans les titres, le navigateur
+// applique alors le poids 700 le plus proche disponible.
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+});
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -59,11 +69,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, [router, pathname]);
 
-  if (loading) return <body><LoadingScreen /></body>;
+  if (loading) return <body className={spaceGrotesk.variable}><LoadingScreen /></body>;
 
   return (
     <html lang="fr">
-      <body>
+      <body className={spaceGrotesk.variable}>
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>

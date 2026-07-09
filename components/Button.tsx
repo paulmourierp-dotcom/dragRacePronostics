@@ -11,15 +11,15 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const VARIANT_CLASSES: Record<Variant, string> = {
   primary:
-    "btn-elevated bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-500/20",
+    "btn-elevated bg-brand hover:bg-brand-hover text-white shadow-sm shadow-brand/20",
   secondary:
-    "bg-white hover:bg-gray-50 text-gray-700 border border-gray-200",
+    "bg-surface hover:bg-page text-ink-soft border border-surface-border",
 };
 
 const SIZE_CLASSES: Record<Size, string> = {
-  sm: "px-3 py-1 text-sm rounded-lg",
-  md: "px-4 py-2 rounded-xl",
-  lg: "w-full py-4 rounded-xl text-base",
+  sm: "px-3 py-1.5 text-sm rounded-button",
+  md: "px-4 py-2.5 rounded-button",
+  lg: "w-full py-4 rounded-button text-base",
 };
 
 export default function Button({

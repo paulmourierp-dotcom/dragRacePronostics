@@ -1,117 +1,143 @@
 "use client";
 import { PredictionData } from "@/types/prediction";
 import { ResultData } from "@/types/result";
+import Chip from "@/components/ui/Chip";
 
-// correct === null : pas encore de résultat officiel (aucun avis à donner)
-export function Chip({ label, correct }: { label: string; correct: boolean | null }) {
-  const style =
-    correct === null
-      ? "bg-gray-100 text-gray-600 border-gray-200"
-      : correct
-      ? "bg-green-100 text-green-800 border-green-300"
-      : "bg-red-100 text-red-800 border-red-300";
-  return (
-    <span className={`text-sm font-semibold px-2 py-1 rounded border ${style}`}>
-      {label}
-    </span>
-  );
-}
-
-function GuessRow({ label, guess, correct }: { label: string; guess: string | null; correct: boolean | null }) {
-  return (
-    <div>
-      <p className="text-sm font-bold text-gray-700 mb-1">{label}</p>
-      {guess ? <Chip label={guess} correct={correct} /> : <span className="text-sm text-gray-400">—</span>}
-    </div>
-  );
+interface CategoryRow {
+  key: string;
+  label: string;
+  mine: { label: string; correct: boolean }[];
+  official: string[];
+  points: number;
 }
 
 interface PredictionBreakdownProps {
   prediction: PredictionData;
-  result: ResultData | null;
+  result: ResultData;
+  // Roster des Queens actives à cet épisode, nécessaire pour reconstruire les choix "safe"
+  // implicites (ni top ni bottom) — voir computeEpisodePoints dans app/admin/page.tsx, qui
+  // applique exactement le même fallback `queensResults[queen] ?? "safe"`.
+  activeQueens: string[];
+  // Historique affiche une colonne "Résultat officiel" en plus des chips du joueur ; la modale
+  // joueur (espace plus réduit) n'affiche que les chips colorées du joueur.
+  showOfficial?: boolean;
 }
 
-export default function PredictionBreakdown({ prediction, result }: PredictionBreakdownProps) {
+export default function PredictionBreakdown({
+  prediction,
+  result,
+  activeQueens,
+  showOfficial = false,
+}: PredictionBreakdownProps) {
+  const rules = result.scoringRules;
+
   const topGuesses = Object.entries(prediction.queensResults)
     .filter(([, v]) => v === "top")
     .map(([queen]) => queen);
-
   const bottomGuesses = Object.entries(prediction.queensResults)
     .filter(([, v]) => v === "bottom")
     .map(([queen]) => queen);
+  const safeGuesses = activeQueens.filter(
+    (q) => !topGuesses.includes(q) && !bottomGuesses.includes(q)
+  );
+  const officialSafe = activeQueens.filter(
+    (q) => !result.top.includes(q) && !result.bottom.includes(q)
+  );
+
+  const groupRow = (
+    key: string,
+    label: string,
+    guesses: string[],
+    official: string[],
+    pointsPerQueen: number
+  ): CategoryRow => {
+    const correctCount = guesses.filter((q) => official.includes(q)).length;
+    return {
+      key,
+      label,
+      mine: guesses.map((q) => ({ label: q, correct: official.includes(q) })),
+      official,
+      points: correctCount * pointsPerQueen,
+    };
+  };
+
+  const singleRow = (
+    key: string,
+    label: string,
+    guess: string | null,
+    official: string,
+    pointsIfCorrect: number
+  ): CategoryRow => {
+    const correct = guess != null && guess === official;
+    return {
+      key,
+      label,
+      mine: guess != null ? [{ label: guess, correct }] : [],
+      official: [official],
+      points: correct ? pointsIfCorrect : 0,
+    };
+  };
+
+  const rows: CategoryRow[] = [
+    groupRow("bottom", "Bottom", bottomGuesses, result.bottom, rules.bottom),
+    groupRow("top", "Top", topGuesses, result.top, rules.top),
+    groupRow("safe", "Safe", safeGuesses, officialSafe, rules.safe),
+    singleRow("eliminee", "Éliminée", prediction.eliminee, result.eliminee, rules.eliminee),
+    singleRow("gagnante", "Gagnante", prediction.winner, result.winner, rules.gagnante),
+    singleRow("miniDefi", "Mini-Défi", prediction.miniDefi, result.miniDefi, rules.miniDefi),
+    singleRow("maxiDefi", "Maxi-Défi", prediction.maxiDefi, result.maxiDefi, rules.maxiDefi),
+  ];
+
+  if (result.bonusQuestion) {
+    const bonusCorrect = prediction.bonusAnswer != null && Boolean(prediction.bonusCorrect);
+    rows.push({
+      key: "bonus",
+      label: `${result.bonusQuestion.question} (bonus)`,
+      mine: prediction.bonusAnswer != null ? [{ label: prediction.bonusAnswer, correct: bonusCorrect }] : [],
+      official: [result.bonusQuestion.answer],
+      points: bonusCorrect ? result.bonusQuestion.points : 0,
+    });
+  }
 
   return (
-    <>
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <div>
-          <p className="text-sm font-bold text-gray-700 mb-1">Top pronostiqué</p>
-          <div className="flex flex-wrap gap-2">
-            {topGuesses.length === 0 ? (
-              <span className="text-sm text-gray-400">—</span>
+    <div className="flex flex-col gap-2">
+      {rows.map((row) => (
+        <div
+          key={row.key}
+          className={`grid ${
+            showOfficial ? "grid-cols-1 sm:grid-cols-[110px_1fr_1fr_60px]" : "grid-cols-1 sm:grid-cols-[110px_1fr_60px]"
+          } gap-3 items-center py-2.5 px-3 bg-page rounded-button`}
+        >
+          <div className="text-xs font-bold text-ink-soft">{row.label}</div>
+          <div className="flex flex-wrap gap-1.5">
+            {row.mine.length === 0 ? (
+              <span className="text-sm text-ink-faint">—</span>
             ) : (
-              topGuesses.map((queen) => (
-                <Chip
-                  key={queen}
-                  label={queen}
-                  correct={result ? result.top.includes(queen) : null}
-                />
-              ))
+              row.mine.map((chip, i) => <Chip key={`${chip.label}-${i}`} label={chip.label} correct={chip.correct} />)
             )}
           </div>
-        </div>
-        <div>
-          <p className="text-sm font-bold text-gray-700 mb-1">Bottom pronostiqué</p>
-          <div className="flex flex-wrap gap-2">
-            {bottomGuesses.length === 0 ? (
-              <span className="text-sm text-gray-400">—</span>
-            ) : (
-              bottomGuesses.map((queen) => (
-                <Chip
-                  key={queen}
-                  label={queen}
-                  correct={result ? result.bottom.includes(queen) : null}
-                />
-              ))
-            )}
+          {showOfficial && (
+            <div className="flex flex-wrap gap-1.5">
+              {row.official.map((name) => (
+                <Chip key={name} label={name} correct={null} />
+              ))}
+            </div>
+          )}
+          <div
+            className={`font-display text-sm font-extrabold text-right ${
+              row.points > 0 ? "text-verdict-correct-ink" : "text-verdict-incorrect-ink"
+            }`}
+          >
+            +{row.points}
           </div>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <GuessRow
-          label="Gagnante"
-          guess={prediction.winner}
-          correct={result ? prediction.winner === result.winner : null}
-        />
-        <GuessRow
-          label="Éliminée"
-          guess={prediction.eliminee}
-          correct={result ? prediction.eliminee === result.eliminee : null}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <GuessRow
-          label="Mini-Défi"
-          guess={prediction.miniDefi}
-          correct={result ? prediction.miniDefi === result.miniDefi : null}
-        />
-        <GuessRow
-          label="Maxi-Défi"
-          guess={prediction.maxiDefi}
-          correct={result ? prediction.maxiDefi === result.maxiDefi : null}
-        />
-      </div>
-
-      {result?.bonusQuestion && (
-        <div className="mt-4 pt-4 border-t border-gray-100">
-          <GuessRow
-            label={`${result.bonusQuestion.question} (bonus, ${result.bonusQuestion.points} pts)`}
-            guess={prediction.bonusAnswer ?? null}
-            correct={prediction.bonusAnswer != null ? Boolean(prediction.bonusCorrect) : null}
-          />
+      ))}
+      {showOfficial && (
+        <div className="flex gap-3 text-xs font-semibold text-ink-faint px-3 pt-1">
+          <div className="flex-1" style={{ paddingLeft: 110 }}>Mon pronostic</div>
+          <div className="flex-1">Résultat officiel</div>
         </div>
       )}
-    </>
+    </div>
   );
 }

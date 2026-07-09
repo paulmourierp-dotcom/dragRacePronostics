@@ -4,20 +4,24 @@ import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import Header from "@/components/Header";
 import LoadingScreen from "@/components/LoadingScreen";
-import EpisodeResultModal from "@/components/EpisodeResultModal";
 import PredictionBreakdown from "@/components/PredictionBreakdown";
-import Button from "@/components/Button";
+import Card from "@/components/ui/Card";
+import Accordion from "@/components/ui/Accordion";
+import PickRow from "@/components/ui/PickRow";
 import { auth, db } from "@/lib/firebase";
 import { collection, doc, getDoc, getDocs, query, where, Timestamp } from "firebase/firestore";
 import { UserData } from "@/types/user";
 import { ConfigData } from "@/types/config";
 import { PredictionData } from "@/types/prediction";
 import { ResultData } from "@/types/result";
+import { QueenData } from "@/types/gameData";
+import { normalizeQueens } from "@/lib/queens";
+import { activeQueensAtEpisode } from "@/lib/episodeRoster";
 
 interface HistoryEntry {
   episodeId: number;
   prediction: PredictionData;
-  result: ResultData | null;
+  result: ResultData;
 }
 
 const formatDateDiffusion = (timestamp?: Timestamp) =>
@@ -31,9 +35,11 @@ const formatDateDiffusion = (timestamp?: Timestamp) =>
 export default function HistoriquePage() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
+  const [allQueens, setAllQueens] = useState<QueenData[]>([]);
+  const [resultsHistory, setResultsHistory] = useState<ResultData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [modalResult, setModalResult] = useState<ResultData | null>(null);
   const [nextEpisode, setNextEpisode] = useState<ConfigData | null>(null);
+  const [draftPrediction, setDraftPrediction] = useState<PredictionData | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -42,9 +48,10 @@ export default function HistoriquePage() {
         const user = auth.currentUser;
         if (!user) return;
 
-        const [userDoc, nextEpisodeSnap] = await Promise.all([
+        const [userDoc, nextEpisodeSnap, queensSnap] = await Promise.all([
           getDoc(doc(db, "users", user.uid)),
           getDoc(doc(db, "config", "next_episode")),
+          getDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9")),
         ]);
 
         const myData = userDoc.data();
@@ -53,24 +60,32 @@ export default function HistoriquePage() {
         const nextEpisodeConfig = nextEpisodeSnap.exists() ? (nextEpisodeSnap.data() as ConfigData) : null;
         setNextEpisode(nextEpisodeConfig);
 
-        const predsSnap = await getDocs(
-          query(collection(db, "predictions"), where("userId", "==", user.uid))
-        );
+        const queens = queensSnap.exists() ? normalizeQueens(queensSnap.data().queens || []) : [];
+        setAllQueens(queens);
+
+        const [predsSnap, resultsSnap] = await Promise.all([
+          getDocs(query(collection(db, "predictions"), where("userId", "==", user.uid))),
+          getDocs(collection(db, "results")),
+        ]);
         const predictions = predsSnap.docs.map((d) => d.data() as PredictionData);
+        const fetchedResultsHistory = resultsSnap.docs.map((d) => d.data() as ResultData);
+        setResultsHistory(fetchedResultsHistory);
+        const resultByEpisode = new Map(fetchedResultsHistory.map((r) => [r.numero, r]));
 
-        const results = await Promise.all(
-          predictions.map((p) => getDoc(doc(db, "results", String(p.episodeId))))
-        );
-
-        const visibleEntries = predictions
-          .map((prediction, i) => ({
-            episodeId: prediction.episodeId,
-            prediction,
-            result: results[i].exists() ? (results[i].data() as ResultData) : null,
-          }))
+        const pastEntries: HistoryEntry[] = predictions
+          .map((prediction) => {
+            const result = resultByEpisode.get(prediction.episodeId);
+            return result ? { episodeId: prediction.episodeId, prediction, result } : null;
+          })
+          .filter((e): e is HistoryEntry => e !== null)
           .sort((a, b) => b.episodeId - a.episodeId);
 
-        setEntries(visibleEntries);
+        setEntries(pastEntries);
+
+        if (nextEpisodeConfig?.numero != null) {
+          const draft = predictions.find((p) => p.episodeId === nextEpisodeConfig.numero) ?? null;
+          setDraftPrediction(draft);
+        }
       } catch (error) {
         console.error("Erreur :", error);
       } finally {
@@ -81,93 +96,125 @@ export default function HistoriquePage() {
     fetchData();
   }, []);
 
-  const renderEntry = ({ episodeId, prediction, result }: HistoryEntry) => {
-    const isStillOpen = !result && episodeId === nextEpisode?.numero;
-
-    return (
-    <div key={episodeId} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold text-gray-900">Épisode {episodeId}</h2>
-        <div className="flex items-center gap-3">
-          {result ? (
-            <span className="font-bold text-purple-700">
-              {prediction.pointsEarned ?? 0} pts
-            </span>
-          ) : isStillOpen ? (
-            <span className="text-sm text-gray-500">
-              Ce pronostic sera bloqué à partir du {formatDateDiffusion(nextEpisode?.dateDiffusion)}
-            </span>
-          ) : (
-            <span className="text-sm text-gray-500">En attente des résultats</span>
-          )}
-          {isStillOpen && (
-            <Button size="sm" onClick={() => router.push("/pronostics")}>
-              Modifier
-            </Button>
-          )}
-          <button
-            onClick={() => result && setModalResult(result)}
-            disabled={!result}
-            className="text-sm px-3 py-1 rounded border border-gray-200 text-gray-700 font-semibold disabled:opacity-40"
-          >
-            Voir les résultats
-          </button>
-        </div>
-      </div>
-
-      <PredictionBreakdown prediction={prediction} result={result} />
-    </div>
-    );
-  };
-
-  const inProgress = entries.filter((e) => e.result === null);
-  const finished = entries.filter((e) => e.result !== null);
+  const draftCategories = draftPrediction
+    ? [
+        {
+          label: "Bottom",
+          values: Object.entries(draftPrediction.queensResults)
+            .filter(([, v]) => v === "bottom")
+            .map(([q]) => q),
+        },
+        { label: "Éliminée", values: draftPrediction.eliminee ? [draftPrediction.eliminee] : [] },
+        {
+          label: "Top",
+          values: Object.entries(draftPrediction.queensResults)
+            .filter(([, v]) => v === "top")
+            .map(([q]) => q),
+        },
+        { label: "Gagnante", values: draftPrediction.winner ? [draftPrediction.winner] : [] },
+        { label: "Mini-défi", values: draftPrediction.miniDefi ? [draftPrediction.miniDefi] : [] },
+        { label: "Maxi-défi", values: draftPrediction.maxiDefi ? [draftPrediction.maxiDefi] : [] },
+        ...(nextEpisode?.bonusQuestion
+          ? [{ label: nextEpisode.bonusQuestion.question, values: draftPrediction.bonusAnswer ? [draftPrediction.bonusAnswer] : [] }]
+          : []),
+      ]
+    : [];
 
   return (
     <AuthGuard>
-      <main className="min-h-screen bg-gray-50">
+      <main className="min-h-screen bg-page">
         <Header isAdmin={userData?.role === "admin"} />
 
-        <div className="p-6 max-w-5xl mx-auto">
-          <h1 className="text-3xl font-bold mb-6 text-gray-900">Historique des pronostics</h1>
+        <div className="max-w-4xl mx-auto px-4 sm:px-8 py-9 pb-16">
+          <h1 className="font-display text-3xl font-extrabold text-ink mb-7">
+            Historique &amp; pronostic en cours
+          </h1>
 
           {loading ? (
             <LoadingScreen message="On compile les scores des dernières lip-syncs..." />
-          ) : entries.length === 0 ? (
-            <div className="p-10 text-center text-gray-500">
-              Aucun pronostic dans l&apos;historique pour le moment.
-            </div>
           ) : (
-            <div className="space-y-10">
-              <section>
-                <h2 className="text-lg font-bold text-gray-900 mb-4">Pronostics en cours</h2>
-                {inProgress.length === 0 ? (
-                  <div className="p-6 text-center text-gray-500 bg-white rounded-xl border border-gray-100">
-                    Aucun pronostic en attente de résultats.
+            <div className="space-y-9">
+              <Card className="p-0 overflow-hidden">
+                <div className="flex justify-between items-center gap-3 flex-wrap px-6 py-5 bg-brand-tint">
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-wide text-brand mb-0.5">
+                      Prochain épisode
+                    </div>
+                    <div className="font-display text-lg font-extrabold text-ink">
+                      Épisode {nextEpisode?.numero ?? "—"}
+                    </div>
                   </div>
-                ) : (
-                  <div className="space-y-6">{inProgress.map(renderEntry)}</div>
-                )}
-              </section>
+                  <span
+                    className={`text-xs font-bold px-3 py-1.5 rounded-pill ${
+                      draftPrediction
+                        ? "bg-verdict-correct-bg text-verdict-correct-ink"
+                        : "bg-status-bottom-bg text-status-bottom-ink"
+                    }`}
+                  >
+                    {draftPrediction ? "✓ Pronostic enregistré" : "Pronostic à faire"}
+                  </span>
+                </div>
 
-              <section>
-                <h2 className="text-lg font-bold text-gray-900 mb-4">Pronostics terminés</h2>
-                {finished.length === 0 ? (
-                  <div className="p-6 text-center text-gray-500 bg-white rounded-xl border border-gray-100">
-                    Aucun pronostic terminé pour le moment.
+                <div className="px-6 py-5">
+                  {!nextEpisode ? (
+                    <p className="text-ink-muted">Aucun épisode à pronostiquer pour le moment.</p>
+                  ) : !draftPrediction ? (
+                    <p className="text-ink-muted">
+                      Tu n&apos;as pas encore pronostiqué cet épisode. Diffusion prévue le{" "}
+                      {formatDateDiffusion(nextEpisode.dateDiffusion)}.
+                    </p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {draftCategories.map((cat) => (
+                        <PickRow key={cat.label} label={cat.label} values={cat.values} />
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => router.push("/pronostics")}
+                    className="text-sm font-bold text-brand mt-4"
+                  >
+                    Modifier le pronostic →
+                  </button>
+                </div>
+              </Card>
+
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wide text-ink-muted mb-4">
+                  Historique
+                </div>
+                {entries.length === 0 ? (
+                  <div className="p-6 text-center text-ink-muted bg-surface rounded-card border border-surface-border">
+                    Aucun épisode diffusé pour le moment.
                   </div>
                 ) : (
-                  <div className="space-y-6">{finished.map(renderEntry)}</div>
+                  <div className="flex flex-col gap-3.5">
+                    {entries.map(({ episodeId, prediction, result }, i) => (
+                      <Accordion
+                        key={episodeId}
+                        defaultOpen={i === 0}
+                        title={`Épisode ${episodeId}`}
+                        subtitle={
+                          <span className="font-display text-sm font-extrabold text-brand bg-brand-tint px-3 py-1 rounded-pill">
+                            {prediction.pointsEarned ?? 0} pts
+                          </span>
+                        }
+                      >
+                        <PredictionBreakdown
+                          prediction={prediction}
+                          result={result}
+                          activeQueens={activeQueensAtEpisode(allQueens, resultsHistory, episodeId)}
+                          showOfficial
+                        />
+                      </Accordion>
+                    ))}
+                  </div>
                 )}
-              </section>
+              </div>
             </div>
           )}
         </div>
       </main>
-
-      {modalResult && (
-        <EpisodeResultModal result={modalResult} onClose={() => setModalResult(null)} />
-      )}
     </AuthGuard>
   );
 }

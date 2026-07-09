@@ -5,6 +5,7 @@ import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
 import { CrownPredictionData } from "@/types/crown";
 import { useToast } from "@/contexts/ToastContext";
 import Button from "@/components/Button";
+import Modal from "@/components/ui/Modal";
 
 interface CrownPredictionModalProps {
   queens: string[];
@@ -55,41 +56,39 @@ export default function CrownPredictionModal({ queens, locked, onClose }: CrownP
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Qui gagnera la couronne cette saison ?</h2>
+    <Modal maxWidth="sm">
+      <h2 className="font-display text-xl font-bold text-ink mb-4">Qui gagnera la couronne cette saison ?</h2>
 
-        {locked && (
-          <p className="text-sm text-red-600 font-semibold mb-4">
-            Les pronostics couronne sont clos, tu ne peux plus les modifier.
-          </p>
-        )}
+      {locked && (
+        <p className="text-sm text-status-eliminee-ink font-semibold mb-4">
+          Les pronostics couronne sont clos, tu ne peux plus les modifier.
+        </p>
+      )}
 
-        {loading ? (
-          <p className="text-gray-500 mb-4">Chargement...</p>
-        ) : (
-          <select
-            value={queenPredicted}
-            onChange={(e) => setQueenPredicted(e.target.value)}
-            disabled={locked}
-            className="w-full border border-gray-200 rounded p-2 text-gray-900 mb-4 disabled:opacity-50"
-          >
-            <option value="">-- Choisis une Queen --</option>
-            {queens.map((queen) => (
-              <option key={queen} value={queen}>{queen}</option>
-            ))}
-          </select>
-        )}
+      {loading ? (
+        <p className="text-ink-muted mb-4">Chargement...</p>
+      ) : (
+        <select
+          value={queenPredicted}
+          onChange={(e) => setQueenPredicted(e.target.value)}
+          disabled={locked}
+          className="w-full border border-surface-border rounded-button p-2 text-ink mb-4 disabled:opacity-50"
+        >
+          <option value="">-- Choisis une Queen --</option>
+          {queens.map((queen) => (
+            <option key={queen} value={queen}>{queen}</option>
+          ))}
+        </select>
+      )}
 
-        <div className="flex gap-2 justify-end">
-          <button onClick={onClose} className="px-4 py-2 rounded-xl text-gray-700 font-bold">
-            {locked ? "Fermer" : "Annuler"}
-          </button>
-          <Button onClick={handleSave} disabled={saving || loading || !queenPredicted || locked}>
-            {saving ? "Enregistrement..." : "Sauvegarder"}
-          </Button>
-        </div>
+      <div className="flex gap-2 justify-end">
+        <button onClick={onClose} className="px-4 py-2 rounded-button text-ink-soft font-bold">
+          {locked ? "Fermer" : "Annuler"}
+        </button>
+        <Button onClick={handleSave} disabled={saving || loading || !queenPredicted || locked}>
+          {saving ? "Enregistrement..." : "Sauvegarder"}
+        </Button>
       </div>
-    </div>
+    </Modal>
   );
 }

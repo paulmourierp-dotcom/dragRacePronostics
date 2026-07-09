@@ -14,10 +14,10 @@ export default function DefiOptions({ options, value, onSelect }: DefiOptionsPro
           key={option}
           type="button"
           onClick={() => onSelect(option)}
-          className={`px-4 py-3 rounded-xl border-2 font-semibold text-sm transition ${
+          className={`px-5 py-3.5 rounded-button border-2 font-semibold text-sm transition ${
             value === option
-              ? "border-purple-600 bg-purple-50 text-purple-700"
-              : "border-gray-200 text-gray-700"
+              ? "border-brand bg-brand-tint text-brand"
+              : "border-surface-border text-ink-soft bg-surface"
           }`}
         >
           {option}
@@ -26,8 +26,8 @@ export default function DefiOptions({ options, value, onSelect }: DefiOptionsPro
       <button
         type="button"
         onClick={() => onSelect("Autre")}
-        className={`px-4 py-3 rounded-xl border-2 font-semibold text-sm transition ${
-          value === "Autre" ? "border-purple-600 bg-purple-50 text-purple-700" : "border-gray-200 text-gray-700"
+        className={`px-5 py-3.5 rounded-button border-2 font-semibold text-sm transition ${
+          value === "Autre" ? "border-brand bg-brand-tint text-brand" : "border-surface-border text-ink-soft bg-surface"
         }`}
       >
         Autre

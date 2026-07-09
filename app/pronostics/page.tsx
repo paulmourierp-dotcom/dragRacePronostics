@@ -19,6 +19,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/contexts/ToastContext";
+import PickChip from "@/components/ui/PickChip";
 
 const STEP_BOTTOM = 1;
 const STEP_ELIMINEE = 2;
@@ -31,16 +32,22 @@ const STEP_RECAP = 8;
 
 interface RecapRowProps {
   label: string;
-  value: string;
+  values: string[];
   onEdit: () => void;
 }
 
-function RecapRow({ label, value, onEdit }: RecapRowProps) {
+function RecapRow({ label, values, onEdit }: RecapRowProps) {
   return (
-    <div className="flex items-center justify-between gap-4 bg-white rounded-xl border border-gray-100 p-4">
-      <div>
-        <p className="text-xs text-gray-400 font-bold uppercase tracking-wide">{label}</p>
-        <p className="text-gray-900 font-semibold">{value}</p>
+    <div className="flex items-center justify-between gap-4 flex-wrap bg-surface rounded-card border border-surface-border p-4">
+      <div className="flex-1 min-w-[140px]">
+        <p className="text-xs text-ink-faint font-bold uppercase tracking-wide mb-1.5">{label}</p>
+        <div className="flex flex-wrap gap-1.5">
+          {values.length === 0 ? (
+            <span className="text-sm text-ink-faint">—</span>
+          ) : (
+            values.map((v) => <PickChip key={v} label={v} />)
+          )}
+        </div>
       </div>
       <Button size="sm" variant="secondary" onClick={onEdit}>
         Modifier
@@ -240,9 +247,9 @@ export default function PronosticPage() {
   if (episodeNum === null) {
     return (
       <AuthGuard>
-        <main className="min-h-screen bg-gray-50">
+        <main className="min-h-screen bg-page">
           <Header isAdmin={userData?.role === "admin"} />
-          <div className="p-10 text-center text-gray-500">
+          <div className="p-10 text-center text-ink-muted">
             Aucun épisode à pronostiquer pour le moment.
           </div>
         </main>
@@ -253,9 +260,9 @@ export default function PronosticPage() {
   if (isPastDeadline) {
     return (
       <AuthGuard>
-        <main className="min-h-screen bg-gray-50">
+        <main className="min-h-screen bg-page">
           <Header isAdmin={userData?.role === "admin"} />
-          <div className="p-10 text-center text-gray-500">
+          <div className="p-10 text-center text-ink-muted">
             Les pronostics pour l&apos;épisode {episodeNum} sont clos : l&apos;épisode a déjà été diffusé.
           </div>
         </main>
@@ -278,7 +285,7 @@ export default function PronosticPage() {
                 points={SCORING_RULES.bottom}
                 multiplier={maxBottom}
               />
-              <p className="text-sm text-gray-500 mb-3">
+              <p className="text-sm text-ink-muted mb-3">
                 Sélectionne de 0 à {maxBottom} Queens, puis clique sur Suivant.
               </p>
               <QueenGrid queens={activeQueens} selected={bottomQueens} max={maxBottom} onChange={handleBottomChange} />
@@ -298,7 +305,7 @@ export default function PronosticPage() {
                 onBack={goBack}
               />
               {bottomQueens.length === 0 ? (
-                <p className="text-sm text-gray-500 bg-gray-100 rounded-xl p-4">
+                <p className="text-sm text-ink-muted bg-page rounded-card p-4">
                   Aucune Queen sélectionnée dans le bottom.
                 </p>
               ) : (
@@ -327,7 +334,7 @@ export default function PronosticPage() {
                 multiplier={maxTop}
                 onBack={goBack}
               />
-              <p className="text-sm text-gray-500 mb-3">
+              <p className="text-sm text-ink-muted mb-3">
                 Sélectionne de 0 à {maxTop} Queens, puis clique sur Suivant.
               </p>
               <QueenGrid
@@ -353,7 +360,7 @@ export default function PronosticPage() {
                 onBack={goBack}
               />
               {topQueens.length === 0 ? (
-                <p className="text-sm text-gray-500 bg-gray-100 rounded-xl p-4">
+                <p className="text-sm text-ink-muted bg-page rounded-card p-4">
                   Aucune Queen sélectionnée dans le top.
                 </p>
               ) : (
@@ -412,7 +419,7 @@ export default function PronosticPage() {
 
           {step === STEP_BONUS && bonusQuestion && (
             <>
-              <div className="mb-4 text-center text-purple-700 font-bold">
+              <div className="mb-4 text-center font-display text-brand font-bold">
                 🎉 Et maintenant... la question bonus !
               </div>
               <StepHeader
@@ -433,28 +440,33 @@ export default function PronosticPage() {
 
           {step === STEP_RECAP && (
             <>
+              <div className="text-center font-display text-sm font-bold text-brand mb-1.5">
+                🎉 Et voici... ton récapitulatif !
+              </div>
               <div className="flex items-center justify-between mb-6">
                 <button
                   onClick={() => setStep(computePrevStep(STEP_RECAP))}
-                  className="text-sm text-gray-500 font-semibold"
+                  className="text-sm text-ink-muted font-semibold"
                 >
                   ← Retour
                 </button>
-                <h1 className="text-2xl font-bold text-gray-900">Récapitulatif</h1>
+                <h1 className="font-display text-2xl font-bold text-ink">
+                  Ton pronostic pour l&apos;épisode {episodeNum}
+                </h1>
                 <span />
               </div>
 
               <div className="space-y-3">
-                <RecapRow label="Bottom" value={bottomQueens.join(" & ") || "-"} onEdit={() => setStep(STEP_BOTTOM)} />
-                <RecapRow label="Éliminée" value={eliminee ?? "-"} onEdit={() => setStep(STEP_ELIMINEE)} />
-                <RecapRow label="Top" value={topQueens.join(" & ") || "-"} onEdit={() => setStep(STEP_TOP)} />
-                <RecapRow label="Gagnante" value={winner ?? "-"} onEdit={() => setStep(STEP_WINNER)} />
-                <RecapRow label="Mini-défi" value={miniDefi ?? "-"} onEdit={() => setStep(STEP_MINI)} />
-                <RecapRow label="Maxi-défi" value={maxiDefi ?? "-"} onEdit={() => setStep(STEP_MAXI)} />
+                <RecapRow label="Bottom" values={bottomQueens} onEdit={() => setStep(STEP_BOTTOM)} />
+                <RecapRow label="Éliminée" values={eliminee ? [eliminee] : []} onEdit={() => setStep(STEP_ELIMINEE)} />
+                <RecapRow label="Top" values={topQueens} onEdit={() => setStep(STEP_TOP)} />
+                <RecapRow label="Gagnante" values={winner ? [winner] : []} onEdit={() => setStep(STEP_WINNER)} />
+                <RecapRow label="Mini-défi" values={miniDefi ? [miniDefi] : []} onEdit={() => setStep(STEP_MINI)} />
+                <RecapRow label="Maxi-défi" values={maxiDefi ? [maxiDefi] : []} onEdit={() => setStep(STEP_MAXI)} />
                 {bonusQuestion && (
                   <RecapRow
                     label={bonusQuestion.question}
-                    value={bonusAnswer ?? "-"}
+                    values={bonusAnswer ? [bonusAnswer] : []}
                     onEdit={() => setStep(STEP_BONUS)}
                   />
                 )}

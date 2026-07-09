@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Image from "next/image";
+import { queenImageUrl } from "@/lib/queens";
 
 interface QueenGridProps {
   queens: string[];
@@ -42,13 +43,13 @@ export default function QueenGrid({ queens, selected, max, disabledTags, onChang
             type="button"
             onClick={() => handleClick(queen)}
             disabled={isDisabled}
-            className={`relative aspect-square rounded-xl overflow-hidden border-4 transition ${
-              isSelected ? "border-purple-600" : "border-transparent"
-            } ${isDisabled ? "opacity-40 grayscale cursor-not-allowed" : "bg-gray-100"}`}
+            className={`relative aspect-square rounded-tile overflow-hidden border-4 transition ${
+              isSelected ? "border-brand" : "border-transparent"
+            } ${isDisabled ? "opacity-40 grayscale cursor-not-allowed" : "bg-page"}`}
           >
             {!brokenImages.has(queen) ? (
               <Image
-                src={`/${encodeURIComponent(queen.replace(/\s+/g, ""))}.jpeg`}
+                src={queenImageUrl(queen)}
                 alt={queen}
                 fill
                 sizes="(max-width: 640px) 45vw, 200px"
@@ -56,7 +57,7 @@ export default function QueenGrid({ queens, selected, max, disabledTags, onChang
                 onError={() => setBrokenImages((prev) => new Set(prev).add(queen))}
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-purple-100 text-purple-700 text-3xl font-bold">
+              <div className="w-full h-full flex items-center justify-center bg-brand-tint text-brand text-3xl font-display font-bold">
                 {queen.charAt(0)}
               </div>
             )}
@@ -66,13 +67,13 @@ export default function QueenGrid({ queens, selected, max, disabledTags, onChang
             </div>
 
             {isSelected && (
-              <span className="absolute top-1.5 right-1.5 bg-purple-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm shadow">
+              <span className="absolute top-1.5 right-1.5 bg-brand text-white rounded-full w-6 h-6 flex items-center justify-center text-sm shadow">
                 ✓
               </span>
             )}
 
             {tag && (
-              <span className="absolute top-1.5 left-1.5 bg-gray-900/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+              <span className="absolute top-1.5 left-1.5 bg-ink/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-pill uppercase tracking-wide">
                 {tag}
               </span>
             )}

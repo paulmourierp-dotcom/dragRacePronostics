@@ -1,11 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { PredictionData } from "@/types/prediction";
 import { ResultData } from "@/types/result";
+import { QueenData } from "@/types/gameData";
+import { normalizeQueens } from "@/lib/queens";
+import { activeQueensAtEpisode } from "@/lib/episodeRoster";
 import PredictionBreakdown from "@/components/PredictionBreakdown";
 import Button from "@/components/Button";
+import Modal from "@/components/ui/Modal";
+import Accordion from "@/components/ui/Accordion";
 
 interface PlayerDetailsModalProps {
   uid: string;
@@ -22,16 +27,17 @@ interface EpisodeEntry {
 
 export default function PlayerDetailsModal({ uid, surnom, rank, onClose }: PlayerDetailsModalProps) {
   const [entries, setEntries] = useState<EpisodeEntry[]>([]);
+  const [allQueens, setAllQueens] = useState<QueenData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [openEpisode, setOpenEpisode] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       // On part de tous les épisodes déjà résultés (pas des pronostics du joueur) : un
       // épisode scoré doit apparaître même si ce joueur n'a jamais pronostiqué dessus.
-      const [resultsSnap, predsSnap] = await Promise.all([
+      const [resultsSnap, predsSnap, queensSnap] = await Promise.all([
         getDocs(collection(db, "results")),
         getDocs(query(collection(db, "predictions"), where("userId", "==", uid))),
+        getDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9")),
       ]);
 
       const predictionByEpisode = new Map<number, PredictionData>();
@@ -50,58 +56,58 @@ export default function PlayerDetailsModal({ uid, surnom, rank, onClose }: Playe
         .sort((a, b) => b.episodeId - a.episodeId);
 
       setEntries(scoredEntries);
+      setAllQueens(queensSnap.exists() ? normalizeQueens(queensSnap.data().queens || []) : []);
       setLoading(false);
     };
 
     fetchData();
   }, [uid]);
 
+  const resultsHistory = entries.map((e) => e.result);
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto">
-        <h2 className="text-xl font-bold text-gray-900">{surnom}</h2>
-        <p className="text-gray-600 font-semibold mb-4">
-          Classement : {rank > 0 ? `${rank}e position` : "Non classé"}
-        </p>
+    <Modal maxWidth="sm">
+      <h2 className="font-display text-xl font-bold text-ink">{surnom}</h2>
+      <p className="text-ink-muted font-semibold mb-4">
+        Classement : {rank > 0 ? `${rank}e position` : "Non classé"}
+      </p>
 
-        {loading ? (
-          <p className="text-gray-500">Chargement...</p>
-        ) : entries.length === 0 ? (
-          <p className="text-gray-500">Aucun épisode résulté pour le moment.</p>
-        ) : (
-          <div className="space-y-2">
-            {entries.map(({ episodeId, prediction, result }) => {
-              const isOpen = openEpisode === episodeId;
-              return (
-                <div key={episodeId} className="border border-gray-100 rounded-xl overflow-hidden">
-                  <button
-                    onClick={() => setOpenEpisode(isOpen ? null : episodeId)}
-                    className="w-full flex justify-between items-center px-4 py-3 bg-gray-50 text-left"
-                  >
-                    <span className="font-bold text-gray-900">Épisode {episodeId}</span>
-                    <span className="font-bold text-purple-700">{prediction?.pointsEarned ?? 0} pts</span>
-                  </button>
-                  {isOpen && (
-                    <div className="p-4">
-                      {prediction ? (
-                        <PredictionBreakdown prediction={prediction} result={result} />
-                      ) : (
-                        <p className="text-sm text-gray-500">
-                          Ce joueur n&apos;a pas effectué de pronostic dans le temps imparti.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        <div className="flex justify-end mt-6">
-          <Button onClick={onClose}>Fermer</Button>
+      {loading ? (
+        <p className="text-ink-muted">Chargement...</p>
+      ) : entries.length === 0 ? (
+        <p className="text-ink-muted">Aucun épisode résulté pour le moment.</p>
+      ) : (
+        <div className="flex flex-col gap-2.5">
+          {entries.map(({ episodeId, prediction, result }) => (
+            <Accordion
+              key={episodeId}
+              title={`Épisode ${episodeId}`}
+              subtitle={
+                <span className="font-display text-sm font-extrabold text-brand bg-brand-tint px-3 py-1 rounded-pill">
+                  {prediction?.pointsEarned ?? 0} pts
+                </span>
+              }
+            >
+              {prediction ? (
+                <PredictionBreakdown
+                  prediction={prediction}
+                  result={result}
+                  activeQueens={activeQueensAtEpisode(allQueens, resultsHistory, episodeId)}
+                  showOfficial={false}
+                />
+              ) : (
+                <p className="text-sm text-ink-muted">
+                  Ce joueur n&apos;a pas effectué de pronostic dans le temps imparti.
+                </p>
+              )}
+            </Accordion>
+          ))}
         </div>
+      )}
+
+      <div className="flex justify-end mt-6">
+        <Button onClick={onClose}>Fermer</Button>
       </div>
-    </div>
+    </Modal>
   );
 }

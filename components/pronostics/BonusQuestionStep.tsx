@@ -35,8 +35,8 @@ export default function BonusQuestionStep({ bonusQuestion, value, onSelect }: Bo
             key={option}
             type="button"
             onClick={() => onSelect(option)}
-            className={`px-4 py-3 rounded-xl border-2 font-semibold text-sm transition ${
-              value === option ? "border-purple-600 bg-purple-50 text-purple-700" : "border-gray-200 text-gray-700"
+            className={`px-5 py-3.5 rounded-button border-2 font-semibold text-sm transition ${
+              value === option ? "border-brand bg-brand-tint text-brand" : "border-surface-border text-ink-soft bg-surface"
             }`}
           >
             {option}
@@ -53,7 +53,7 @@ export default function BonusQuestionStep({ bonusQuestion, value, onSelect }: Bo
         value={freeText}
         onChange={(e) => setFreeText(e.target.value)}
         placeholder="Ta réponse"
-        className="flex-1 border border-gray-200 rounded-xl p-3 text-gray-900"
+        className="flex-1 border border-surface-border rounded-button p-3 text-ink"
       />
       <Button size="md" disabled={!freeText.trim()} onClick={() => onSelect(freeText.trim())}>
         Valider

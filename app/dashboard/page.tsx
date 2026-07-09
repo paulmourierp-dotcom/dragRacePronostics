@@ -1,20 +1,25 @@
 "use client";
 import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
-// import { doc, getDoc, orderBy } from "firebase/firestore";
 import { doc, getDoc, collection, getDocs, query, orderBy, Timestamp } from "firebase/firestore";
 import { useRouter } from "next/navigation";
-import { UserData } from "@/types/user"; // Ajuste le chemin selon ton dossier
-import { ConfigData } from "@/types/config"; // Ajuste le chemin selon ton dossier
+import { UserData } from "@/types/user";
+import { ConfigData } from "@/types/config";
 import { CrownResultData } from "@/types/crown";
 import { PredictionData } from "@/types/prediction";
+import { ResultData } from "@/types/result";
+import { QueenData } from "@/types/gameData";
+import { QueenRatingData } from "@/types/rating";
 import { normalizeQueens } from "@/lib/queens";
-import Image from 'next/image';
+import { activeQueensAtEpisode } from "@/lib/episodeRoster";
+import { isRatingComplete } from "@/lib/rating";
+import Image from "next/image";
 import Header from "@/components/Header";
 import CrownPredictionModal from "@/components/CrownPredictionModal";
 import PlayerDetailsModal from "@/components/PlayerDetailsModal";
 import PendingActionsModal, { PendingActionItem } from "@/components/PendingActionsModal";
 import Button from "@/components/Button";
+import Card from "@/components/ui/Card";
 import { useToast } from "@/contexts/ToastContext";
 
 const formatDateDiffusion = (timestamp?: Timestamp) =>
@@ -59,6 +64,7 @@ export default function DashboardPage() {
   const [showCrownModal, setShowCrownModal] = useState(false);
   const [pendingItems, setPendingItems] = useState<PendingActionItem[]>([]);
   const [showPendingModal, setShowPendingModal] = useState(false);
+  const [pendingRatingEpisode, setPendingRatingEpisode] = useState<number | null>(null);
   const showToast = useToast();
 
     useEffect(() => {
@@ -107,13 +113,12 @@ export default function DashboardPage() {
             setHasPrediction(false);
             }
 
-            // 4. Récupérer la liste des Queens encore en course (pour le pronostic couronne)
+            // 4. Récupérer la liste des Queens (toutes, + actives pour le pronostic couronne)
             const queensSnap = await getDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9"));
+            let allQueens: QueenData[] = [];
             if (queensSnap.exists()) {
-            const activeQueens = normalizeQueens(queensSnap.data().queens || [])
-              .filter((q) => !q.eliminee)
-              .map((q) => q.name);
-            setQueens(activeQueens);
+            allQueens = normalizeQueens(queensSnap.data().queens || []);
+            setQueens(allQueens.filter((qn) => !qn.eliminee).map((qn) => qn.name));
             }
 
             // 5. Savoir si les pronostics couronne sont verrouillés par l'admin, et si j'en ai déjà fait un
@@ -127,7 +132,28 @@ export default function DashboardPage() {
               setCrownLocked(isCrownLocked);
             }
 
-            // 6. Rappels : question bonus réinitialisée, nouvel épisode à pronostiquer, couronne manquante.
+            // 5bis. Notation en attente : le plus ancien épisode publié pas encore entièrement noté.
+            const resultsSnap = await getDocs(collection(db, "results"));
+            const resultsHistory = resultsSnap.docs
+              .map((d) => d.data() as ResultData)
+              .sort((a, b) => a.numero - b.numero);
+
+            const ratingSnaps = await Promise.all(
+              resultsHistory.map((r) => getDoc(doc(db, "queenRatings", `${user.uid}_ep${r.numero}`)))
+            );
+            let pendingEpisode: number | null = null;
+            for (let i = 0; i < resultsHistory.length; i++) {
+              const result = resultsHistory[i];
+              const roster = activeQueensAtEpisode(allQueens, resultsHistory, result.numero);
+              const rating = ratingSnaps[i].exists() ? (ratingSnaps[i].data() as QueenRatingData) : null;
+              if (!isRatingComplete(rating, roster)) {
+                pendingEpisode = result.numero;
+                break;
+              }
+            }
+            setPendingRatingEpisode(pendingEpisode);
+
+            // 6. Rappels : question bonus réinitialisée, nouvel épisode à pronostiquer, couronne manquante, notation en attente.
             const items: PendingActionItem[] = [];
 
             if (myPrediction?.bonusAnswerPending) {
@@ -173,6 +199,16 @@ export default function DashboardPage() {
               });
             }
 
+            if (pendingEpisode != null) {
+              items.push({
+                key: "rating",
+                title: `Ton avis sur l'épisode ${pendingEpisode}`,
+                description: `Note la prestation de chaque Queen à l'épisode ${pendingEpisode}, ça ne prend qu'une minute.`,
+                actionLabel: "Noter les Queens",
+                onAction: () => router.push(`/notation/${pendingEpisode}`),
+              });
+            }
+
             setPendingItems(items);
             setShowPendingModal(items.length > 0);
           } catch (error) {
@@ -206,73 +242,73 @@ export default function DashboardPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-page">
       <Header isAdmin={userData?.role === "admin"} />
 
       {/* Bienvenue */}
-      <h1 className="text-3xl font-bold p-6 text-gray-900">Bienvenue {userData?.surnom || "Queen"} !</h1>
+      <h1 className="font-display text-3xl font-extrabold p-6 text-ink">
+        Bienvenue {userData?.surnom || "Queen"} 👋
+      </h1>
 
       {/* Colonnes */}
       <div className="grid md:grid-cols-2 gap-6 p-6">
       {/* Colonne Gauche : Stats & Classement */}
-        <section id="podium" className="space-y-6">
-            <div className="bg-white p-6 rounded shadow border border-gray-200 rounded-xl">
-            <h2 className="text-xl font-bold mb-4 text-gray-900">Tes Statistiques</h2>
-            <p className="text-gray-800">Score total : {userData?.score || 0} points</p>
-            <p className="text-gray-800 font-semibold">Classement : {userData?.score === 0 ? "Non classé" : `${myRank}e position`}</p>
-            </div>
-
-            {/* Podium */}
-            <div className="bg-white p-6 rounded shadow border border-gray-200 rounded-xl">
-            <h2 className="text-xl font-bold mb-4 text-gray-900">Podium</h2>
-            <div className="flex justify-around items-end mb-8">
-                {rankedPlayers.slice(0, 3).map((player) => (
-                <div key={player.uid} className="text-center flex flex-col items-center">
-                    {/* Ajout de la couronne pour le(s) 1er(s), même en cas d'ex-aequo */}
-                    {player.rank === 1 && <span className="text-3xl mb-1">👑</span>}
-                    <button
-                      onClick={() => setSelectedPlayer(player)}
-                      className="font-bold text-lg hover:underline"
-                    >
-                      {player.surnom}
-                    </button>
-                    <div className="bg-purple-600 text-white px-4 py-2 rounded mt-1">
-                    {(player.score ?? 0) > 0 ? `${player.score} pts` : "0 pts"}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-2">
-                      {player.rank}e place{isTied(player.rank) ? " (ex æquo)" : ""}
-                    </div>
+        <section className="space-y-6">
+            <Card>
+            <div className="text-xs font-bold uppercase tracking-wide text-ink-muted mb-4">Tes statistiques</div>
+            <div className="flex gap-7 flex-wrap">
+              <div>
+                <div className="font-display text-3xl font-extrabold text-brand">{userData?.score || 0}</div>
+                <div className="text-sm font-semibold text-ink-muted">points au total</div>
+              </div>
+              <div>
+                <div className="font-display text-3xl font-extrabold text-ink">
+                  {userData?.score === 0 ? "Non classé" : `${myRank}e`}
                 </div>
-                ))}
+                <div className="text-sm font-semibold text-ink-muted">classement général</div>
+              </div>
             </div>
+            </Card>
 
-            {/* Liste des autres avec classement */}
-            <ul className="divide-y divide-gray-100">
-                {rankedPlayers.slice(3).map((player) => (
-                <li key={player.uid} className="py-2 flex justify-between">
-                    <span className="font-medium">
-                    <span className="text-gray-400 mr-3">
-                      {player.rank}e{isTied(player.rank) ? " (ex æquo)" : ""}
-                    </span>
-                    <button onClick={() => setSelectedPlayer(player)} className="hover:underline">
+            <Card>
+            <div className="text-xs font-bold uppercase tracking-wide text-ink-muted mb-4">Classement</div>
+            <div className="flex flex-col gap-0.5">
+                {rankedPlayers.map((player) => (
+                  <div
+                    key={player.uid}
+                    onClick={() => setSelectedPlayer(player)}
+                    className={`flex items-center gap-3.5 px-2.5 py-2.5 rounded-button cursor-pointer ${
+                      player.uid === auth.currentUser?.uid ? "bg-page" : ""
+                    }`}
+                  >
+                    <div className={`w-7 text-center font-display font-extrabold text-sm ${
+                      player.rank === 1 ? "text-[#b45309]" : "text-ink-muted"
+                    }`}>
+                      {player.rank}e
+                    </div>
+                    <div className="flex-1 font-bold text-sm text-ink">
+                      {player.rank === 1 && "👑 "}
                       {player.surnom}
-                    </button>
-                    </span>
-                    <span className="font-bold">
-                    {(player.score ?? 0) > 0 ? `${player.score} pts` : "0 pts"}
-                    </span>
-                </li>
+                      {isTied(player.rank) ? " (ex æquo)" : ""}
+                    </div>
+                    <div className="font-display font-extrabold text-sm text-brand bg-brand-tint px-3 py-1 rounded-pill">
+                      {player.score ?? 0} pts
+                    </div>
+                  </div>
                 ))}
-            </ul>
             </div>
+            <div className="text-xs font-medium text-ink-faint mt-3">
+              Clique sur un pseudo pour voir ses pronostics passés →
+            </div>
+            </Card>
         </section>
 
         <section className="space-y-6">
-            <section className="bg-white p-6 rounded-[15px] shadow-sm border border-gray-100">
+            <Card>
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
-                  <h2 className="text-xl font-bold text-gray-950">Prochain Épisode</h2>
+                  <div className="font-display text-xl font-bold text-ink">Prochain Épisode</div>
                   {hasPrediction && (
-                    <span className="inline-flex items-center gap-1 text-green-700 bg-green-50 border border-green-200 rounded-full px-3 py-1 text-xs font-semibold">
+                    <span className="inline-flex items-center gap-1 text-verdict-correct-ink bg-verdict-correct-bg rounded-pill px-3 py-1 text-xs font-semibold">
                       ✓ Pronostic enregistré
                     </span>
                   )}
@@ -281,20 +317,18 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
                     {/* Colonne Gauche : Infos */}
                     <div className="space-y-2">
-                        <p className="text-gray-900 font-bold text-lg">Saison 4</p>
-                        <p className="text-purple-700 font-bold text-2xl">Épisode {nextEpisodeData?.numero}</p>
+                        <p className="text-ink font-bold text-lg">Saison 4</p>
+                        <p className="font-display text-brand font-extrabold text-2xl">Épisode {nextEpisodeData?.numero}</p>
                         <div className="pt-4">
-                            <p className="text-sm text-gray-500">Diffusion prévue le :</p>
-                            <p className="font-semibold text-gray-800">{formatDateDiffusion(nextEpisodeData?.dateDiffusion)}</p>
+                            <p className="text-sm text-ink-muted">Diffusion prévue le :</p>
+                            <p className="font-semibold text-ink-soft">{formatDateDiffusion(nextEpisodeData?.dateDiffusion)}</p>
                         </div>
-                        <p className="text-sm text-purple-700 font-bold mt-2">Pronostics de l&apos;épisode {nextEpisodeData?.numero} ouverts jusqu&apos;à la diffusion :</p>
-                        <p className="text-sm text-purple-700 font-bold mt-2">{formatDateDiffusion(nextEpisodeData?.dateDiffusion)}</p>
                     </div>
 
                     {/* Colonne Droite : Miniature */}
-                    <div className="relative w-full aspect-video overflow-hidden rounded-[15px]">
-                    <Image 
-                        src="/miniature.jpg" 
+                    <div className="relative w-full aspect-video overflow-hidden rounded-tile">
+                    <Image
+                        src="/miniature.jpg"
                         alt="Miniature prochain épisode"
                         fill
                         className="object-cover"
@@ -304,15 +338,30 @@ export default function DashboardPage() {
                 </div>
 
                 <Button onClick={handleGoToPronostics} size="lg" className="mt-6">
-                Pronostiquer l&apos;épisode {nextEpisodeData?.numero}
+                {hasPrediction ? "Modifier mon pronostic" : `Pronostiquer l'épisode ${nextEpisodeData?.numero ?? ""}`}
                 </Button>
-            </section>
+            </Card>
 
-            <div className="bg-white p-6 rounded shadow text-center rounded-xl">
+            <Card className="text-center">
                 <Button onClick={() => setShowCrownModal(true)} disabled={crownLocked} size="lg">
                 {crownLocked ? "Pronostics couronne clos" : "Pronostiquer la gagnante de la saison"}
                 </Button>
-            </div>
+            </Card>
+
+            {pendingRatingEpisode != null && (
+              <Card>
+                <div className="text-xs font-bold uppercase tracking-wide text-ink-muted mb-2.5">Ton avis compte</div>
+                <div className="font-display text-lg font-extrabold text-ink mb-1.5">
+                  Note les Queens de l&apos;épisode {pendingRatingEpisode}
+                </div>
+                <p className="text-sm text-ink-soft mb-4">
+                  Donne une note sur 10 à chaque queen pour cet épisode, à chaud.
+                </p>
+                <Button size="lg" onClick={() => router.push(`/notation/${pendingRatingEpisode}`)}>
+                  Noter les Queens
+                </Button>
+              </Card>
+            )}
         </section>
       </div>
 

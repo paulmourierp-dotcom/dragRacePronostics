@@ -1,6 +1,7 @@
 "use client";
 import { ResultData } from "@/types/result";
 import Button from "@/components/Button";
+import Modal from "@/components/ui/Modal";
 
 interface EpisodeResultModalProps {
   result: ResultData;
@@ -9,25 +10,23 @@ interface EpisodeResultModalProps {
 
 export default function EpisodeResultModal({ result, onClose }: EpisodeResultModalProps) {
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">
-          Résultats officiels - Épisode {result.numero}
-        </h2>
+    <Modal maxWidth="sm">
+      <h2 className="font-display text-xl font-bold text-ink mb-4">
+        Résultats officiels - Épisode {result.numero}
+      </h2>
 
-        <ul className="space-y-2 text-gray-800">
-          <li><span className="font-bold">Top :</span> {result.top.join(", ")}</li>
-          <li><span className="font-bold">Bottom :</span> {result.bottom.join(", ")}</li>
-          <li><span className="font-bold">Gagnante :</span> {result.winner}</li>
-          <li><span className="font-bold">Éliminée :</span> {result.eliminee}</li>
-          <li><span className="font-bold">Mini-Défi :</span> {result.miniDefi}</li>
-          <li><span className="font-bold">Maxi-Défi :</span> {result.maxiDefi}</li>
-        </ul>
+      <ul className="space-y-2 text-ink-soft">
+        <li><span className="font-bold text-ink">Top :</span> {result.top.join(", ")}</li>
+        <li><span className="font-bold text-ink">Bottom :</span> {result.bottom.join(", ")}</li>
+        <li><span className="font-bold text-ink">Gagnante :</span> {result.winner}</li>
+        <li><span className="font-bold text-ink">Éliminée :</span> {result.eliminee}</li>
+        <li><span className="font-bold text-ink">Mini-Défi :</span> {result.miniDefi}</li>
+        <li><span className="font-bold text-ink">Maxi-Défi :</span> {result.maxiDefi}</li>
+      </ul>
 
-        <div className="flex justify-end mt-6">
-          <Button onClick={onClose}>Fermer</Button>
-        </div>
+      <div className="flex justify-end mt-6">
+        <Button onClick={onClose}>Fermer</Button>
       </div>
-    </div>
+    </Modal>
   );
 }

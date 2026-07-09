@@ -25,6 +25,9 @@ import { BonusQuestion } from "@/types/bonus";
 import { normalizeQueens } from "@/lib/queens";
 import { SCORING_RULES, DEFAULT_MAX_QUEENS } from "@/lib/scoring";
 import { normalizeAnswer } from "@/lib/textNormalize";
+import { activeQueensAtEpisode } from "@/lib/episodeRoster";
+import { isRatingComplete } from "@/lib/rating";
+import { QueenRatingData } from "@/types/rating";
 import Header from "@/components/Header";
 import LoadingScreen from "@/components/LoadingScreen";
 import NextEpisodeModal from "@/components/NextEpisodeModal";
@@ -47,6 +50,8 @@ interface UserRow extends UserData {
   uid: string;
   hasPredicted: boolean;
   hasCrownPrediction: boolean;
+  // null = aucun épisode publié pour l'instant, la question ne se pose pas encore.
+  hasRated: boolean | null;
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -361,11 +366,10 @@ export default function AdminPage() {
 
         // Historique de tous les résultats déjà publiés (pour la partie non modifiable)
         const resultsHistorySnap = await getDocs(collection(db, "results"));
-        setResultsHistory(
-          resultsHistorySnap.docs
-            .map((d) => d.data() as ResultData)
-            .sort((a, b) => b.numero - a.numero)
-        );
+        const resultsHistoryList = resultsHistorySnap.docs
+          .map((d) => d.data() as ResultData)
+          .sort((a, b) => b.numero - a.numero);
+        setResultsHistory(resultsHistoryList);
 
         // Charger la liste des joueurs, avec leur uid, s'ils ont déjà pronostiqué l'épisode en
         // cours et s'ils ont pronostiqué la gagnante de la saison
@@ -380,6 +384,7 @@ export default function AdminPage() {
             role: data.role || "user",
             hasPredicted: false,
             hasCrownPrediction: false,
+            hasRated: null,
           };
         });
 
@@ -398,6 +403,29 @@ export default function AdminPage() {
         usersList.forEach((u, i) => {
           u.hasCrownPrediction = crownPredictionChecks[i].exists();
         });
+
+        // Colonne "Notation effectuée" : ciblée sur le DERNIER épisode publié (pas le prochain,
+        // contrairement à hasPredicted) puisque la notation ne s'ouvre qu'une fois les résultats
+        // publiés — c'est la question actionnable pour l'admin ("tout le monde a-t-il noté ce qui
+        // vient de sortir ?"). `null` tant qu'aucun épisode n'a encore été publié.
+        const notationTargetEpisode = resultsHistoryList[0]?.numero ?? null;
+        if (notationTargetEpisode !== null) {
+          const notationActiveQueens = activeQueensAtEpisode(
+            normalizeQueens(listsSnap.exists() ? listsSnap.data().queens || [] : []),
+            resultsHistoryList,
+            notationTargetEpisode
+          );
+          const ratingChecks = await Promise.all(
+            usersList.map((u) => getDoc(doc(db, "queenRatings", `${u.uid}_ep${notationTargetEpisode}`)))
+          );
+          usersList.forEach((u, i) => {
+            const ratingSnap = ratingChecks[i];
+            u.hasRated = isRatingComplete(
+              ratingSnap.exists() ? (ratingSnap.data() as QueenRatingData) : null,
+              notationActiveQueens
+            );
+          });
+        }
 
         setUsers(usersList);
       } else {
@@ -453,15 +481,16 @@ export default function AdminPage() {
 
   // Le tableau de résultats d'un épisode doit refléter le roster tel qu'il était à CE moment-là,
   // pas le statut global "eliminee" actuel : une Queen éliminée plus tard (ou dans cet épisode
-  // même) était encore active à l'époque. On s'appuie sur l'historique des résultats déjà publiés
-  // pour le savoir, ce qui permet de rouvrir et corriger n'importe quel épisode passé.
+  // même) était encore active à l'époque. `activeQueensAtEpisode` (lib/episodeRoster.ts) le
+  // reconstruit à partir de l'historique des résultats déjà publiés, ce qui permet de rouvrir et
+  // corriger n'importe quel épisode passé. On y ajoute `resultsEliminee` : c'est une sélection en
+  // cours dans CE formulaire, pas encore persistée dans `queensList`/`resultsHistory`, donc
+  // l'historique seul ne la verrait pas encore comme "encore active à cet épisode".
+  const activeAtResultsEpisode = new Set(
+    activeQueensAtEpisode(queensList, resultsHistory, resultsEpisodeNum)
+  );
   const resultsActiveQueens = queensList
-    .filter((q) => {
-      if (!q.eliminee) return true;
-      if (q.name === resultsEliminee) return true;
-      const eliminatedAtEpisode = resultsHistory.find((r) => r.eliminee === q.name)?.numero;
-      return eliminatedAtEpisode !== undefined && eliminatedAtEpisode >= resultsEpisodeNum;
-    })
+    .filter((q) => activeAtResultsEpisode.has(q.name) || q.name === resultsEliminee)
     .map((q) => q.name);
   const resultsTopQueens = resultsActiveQueens.filter((q) => resultsQueensStatus[q] === "top");
   const resultsBottomQueens = resultsActiveQueens.filter((q) => resultsQueensStatus[q] === "bottom");
@@ -843,6 +872,7 @@ export default function AdminPage() {
                       <th className="py-2 text-gray-500 font-bold uppercase text-xs">Surnom</th>
                       <th className="py-2 text-gray-500 font-bold uppercase text-xs text-center">Pronostic réalisé</th>
                       <th className="py-2 text-gray-500 font-bold uppercase text-xs text-center">Pronostic gagnante</th>
+                      <th className="py-2 text-gray-500 font-bold uppercase text-xs text-center">Notation effectuée</th>
                       <th className="py-2 text-gray-500 font-bold uppercase text-xs text-right">Score</th>
                     </tr>
                   </thead>
@@ -852,6 +882,7 @@ export default function AdminPage() {
                         <td className="py-3 text-gray-900 font-medium">{u.surnom}</td>
                         <td className="py-3 text-center">{u.hasPredicted ? "✅" : "❌"}</td>
                         <td className="py-3 text-center">{u.hasCrownPrediction ? "✅" : "❌"}</td>
+                        <td className="py-3 text-center">{u.hasRated === null ? "—" : u.hasRated ? "✅" : "❌"}</td>
                         <td className="py-3 text-gray-900 font-bold text-right">{u.score ?? 0} pts</td>
                       </tr>
                     ))}
