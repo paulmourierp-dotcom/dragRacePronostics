@@ -10,7 +10,7 @@ interface EpisodeResultModalProps {
 
 export default function EpisodeResultModal({ result, onClose }: EpisodeResultModalProps) {
   return (
-    <Modal maxWidth="sm">
+    <Modal onClose={onClose} maxWidth="sm">
       <h2 className="font-display text-xl font-bold text-ink mb-4">
         Résultats officiels - Épisode {result.numero}
       </h2>

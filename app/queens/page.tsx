@@ -11,14 +11,6 @@ import { UserData } from "@/types/user";
 import { QueenData } from "@/types/gameData";
 import { ResultData } from "@/types/result";
 import { normalizeQueens, queenImageUrl } from "@/lib/queens";
-import { statusForQueenInResult, QueenEpisodeStatus } from "@/lib/queenStatus";
-
-const DOT_CLASSES: Record<QueenEpisodeStatus, string> = {
-  winner: "bg-status-winner-ink",
-  top: "bg-status-top-ink",
-  bottom: "bg-status-bottom-ink",
-  safe: "bg-status-safe-ink",
-};
 
 export default function QueensPage() {
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -32,30 +24,32 @@ export default function QueensPage() {
       const user = auth.currentUser;
       if (!user) return;
 
-      const [userDoc, queensSnap, resultsSnap] = await Promise.all([
-        getDoc(doc(db, "users", user.uid)),
-        getDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9")),
-        getDocs(collection(db, "results")),
-      ]);
+      try {
+        const [userDoc, queensSnap, resultsSnap] = await Promise.all([
+          getDoc(doc(db, "users", user.uid)),
+          getDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9")),
+          getDocs(collection(db, "results")),
+        ]);
 
-      const myData = userDoc.data();
-      setUserData(myData ? (myData as UserData) : null);
+        const myData = userDoc.data();
+        setUserData(myData ? (myData as UserData) : null);
 
-      if (queensSnap.exists()) {
-        setQueens(normalizeQueens(queensSnap.data().queens || []));
+        if (queensSnap.exists()) {
+          setQueens(normalizeQueens(queensSnap.data().queens || []));
+        }
+
+        setResultsHistory(
+          resultsSnap.docs.map((d) => d.data() as ResultData).sort((a, b) => b.numero - a.numero)
+        );
+      } catch (error) {
+        console.error("Erreur :", error);
+      } finally {
+        setLoading(false);
       }
-
-      setResultsHistory(
-        resultsSnap.docs.map((d) => d.data() as ResultData).sort((a, b) => b.numero - a.numero)
-      );
-
-      setLoading(false);
     };
 
     fetchData();
   }, []);
-
-  const mostRecentResult = resultsHistory[0] ?? null;
 
   return (
     <AuthGuard>
@@ -74,9 +68,6 @@ export default function QueensPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
               {queens.map((queen) => {
                 const eliminatedResult = resultsHistory.find((r) => r.eliminee === queen.name);
-                const status = mostRecentResult
-                  ? statusForQueenInResult(queen.name, mostRecentResult)
-                  : null;
 
                 return (
                   <button
@@ -97,12 +88,6 @@ export default function QueensPage() {
                       <div className="absolute top-2.5 left-2.5 right-2.5 bg-status-eliminee-ink/90 text-white font-display text-[10px] font-bold tracking-wide text-center py-1.5 px-1 rounded-button">
                         ÉLIMINÉE ÉP.{eliminatedResult.numero}
                       </div>
-                    )}
-
-                    {!queen.eliminee && status && (
-                      <span
-                        className={`absolute top-2.5 right-2.5 w-3 h-3 rounded-full border-2 border-white ${DOT_CLASSES[status]}`}
-                      />
                     )}
 
                     <div className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-xs sm:text-sm font-bold text-center py-1.5 px-1">

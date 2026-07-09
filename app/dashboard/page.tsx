@@ -133,23 +133,30 @@ export default function DashboardPage() {
             }
 
             // 5bis. Notation en attente : le plus ancien épisode publié pas encore entièrement noté.
-            const resultsSnap = await getDocs(collection(db, "results"));
-            const resultsHistory = resultsSnap.docs
-              .map((d) => d.data() as ResultData)
-              .sort((a, b) => a.numero - b.numero);
-
-            const ratingSnaps = await Promise.all(
-              resultsHistory.map((r) => getDoc(doc(db, "queenRatings", `${user.uid}_ep${r.numero}`)))
-            );
+            // Isolé dans son propre try/catch : une erreur ici (ex. règle Firestore queenRatings pas
+            // encore déployée) ne doit jamais empêcher le reste du dashboard (checklist bonus/épisode/
+            // couronne, classement...) de s'afficher.
             let pendingEpisode: number | null = null;
-            for (let i = 0; i < resultsHistory.length; i++) {
-              const result = resultsHistory[i];
-              const roster = activeQueensAtEpisode(allQueens, resultsHistory, result.numero);
-              const rating = ratingSnaps[i].exists() ? (ratingSnaps[i].data() as QueenRatingData) : null;
-              if (!isRatingComplete(rating, roster)) {
-                pendingEpisode = result.numero;
-                break;
+            try {
+              const resultsSnap = await getDocs(collection(db, "results"));
+              const resultsHistory = resultsSnap.docs
+                .map((d) => d.data() as ResultData)
+                .sort((a, b) => a.numero - b.numero);
+
+              const ratingSnaps = await Promise.all(
+                resultsHistory.map((r) => getDoc(doc(db, "queenRatings", `${user.uid}_ep${r.numero}`)))
+              );
+              for (let i = 0; i < resultsHistory.length; i++) {
+                const result = resultsHistory[i];
+                const roster = activeQueensAtEpisode(allQueens, resultsHistory, result.numero);
+                const rating = ratingSnaps[i].exists() ? (ratingSnaps[i].data() as QueenRatingData) : null;
+                if (!isRatingComplete(rating, roster)) {
+                  pendingEpisode = result.numero;
+                  break;
+                }
               }
+            } catch (error) {
+              console.error("Erreur lors du calcul de la notation en attente :", error);
             }
             setPendingRatingEpisode(pendingEpisode);
 
@@ -272,7 +279,7 @@ export default function DashboardPage() {
 
             <Card>
             <div className="text-xs font-bold uppercase tracking-wide text-ink-muted mb-4">Classement</div>
-            <div className="flex flex-col gap-0.5">
+            <div className="flex flex-col gap-0.5 max-h-[420px] overflow-y-auto">
                 {rankedPlayers.map((player) => (
                   <div
                     key={player.uid}

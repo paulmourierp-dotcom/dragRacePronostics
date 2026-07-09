@@ -8,16 +8,19 @@ const MAX_WIDTH_CLASSES = {
 } as const;
 
 interface ModalProps {
+  onClose: () => void;
   maxWidth?: keyof typeof MAX_WIDTH_CLASSES;
   children: ReactNode;
 }
 
-// Pas de fermeture au clic sur le backdrop : certaines modales contiennent un formulaire
-// non sauvegardé, la fermeture doit toujours passer par une action explicite (bouton dans children).
-export default function Modal({ maxWidth = "sm", children }: ModalProps) {
+export default function Modal({ onClose, maxWidth = "sm", children }: ModalProps) {
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    >
       <div
+        onClick={(e) => e.stopPropagation()}
         className={`bg-surface rounded-card shadow-card p-6 w-full ${MAX_WIDTH_CLASSES[maxWidth]} max-h-[85vh] overflow-y-auto`}
       >
         {children}

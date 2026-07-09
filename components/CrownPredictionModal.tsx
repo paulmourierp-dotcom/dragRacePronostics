@@ -56,7 +56,7 @@ export default function CrownPredictionModal({ queens, locked, onClose }: CrownP
   };
 
   return (
-    <Modal maxWidth="sm">
+    <Modal onClose={onClose} maxWidth="sm">
       <h2 className="font-display text-xl font-bold text-ink mb-4">Qui gagnera la couronne cette saison ?</h2>
 
       {locked && (

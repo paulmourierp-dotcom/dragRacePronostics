@@ -66,7 +66,7 @@ export default function PlayerDetailsModal({ uid, surnom, rank, onClose }: Playe
   const resultsHistory = entries.map((e) => e.result);
 
   return (
-    <Modal maxWidth="sm">
+    <Modal onClose={onClose} maxWidth="lg">
       <h2 className="font-display text-xl font-bold text-ink">{surnom}</h2>
       <p className="text-ink-muted font-semibold mb-4">
         Classement : {rank > 0 ? `${rank}e position` : "Non classé"}

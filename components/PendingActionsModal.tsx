@@ -19,7 +19,7 @@ interface PendingActionsModalProps {
 // effectuées (pas de bouton "plus tard" persistant) : c'est volontaire, pour ne rien oublier.
 export default function PendingActionsModal({ items, onClose }: PendingActionsModalProps) {
   return (
-    <Modal maxWidth="sm">
+    <Modal onClose={onClose} maxWidth="sm">
       <h2 className="font-display text-xl font-bold text-ink mb-1">Avant de continuer</h2>
       <p className="text-sm text-ink-muted mb-4">
         Il te reste {items.length > 1 ? "quelques actions" : "une action"} à faire :

@@ -318,6 +318,7 @@ export default function AdminPage() {
         return;
       }
 
+      try {
       const userDoc = await getDoc(doc(db, "users", user.uid));
       if (userDoc.exists() && userDoc.data().role === "admin") {
         setIsAdmin(true);
@@ -407,31 +408,41 @@ export default function AdminPage() {
         // Colonne "Notation effectuée" : ciblée sur le DERNIER épisode publié (pas le prochain,
         // contrairement à hasPredicted) puisque la notation ne s'ouvre qu'une fois les résultats
         // publiés — c'est la question actionnable pour l'admin ("tout le monde a-t-il noté ce qui
-        // vient de sortir ?"). `null` tant qu'aucun épisode n'a encore été publié.
-        const notationTargetEpisode = resultsHistoryList[0]?.numero ?? null;
-        if (notationTargetEpisode !== null) {
-          const notationActiveQueens = activeQueensAtEpisode(
-            normalizeQueens(listsSnap.exists() ? listsSnap.data().queens || [] : []),
-            resultsHistoryList,
-            notationTargetEpisode
-          );
-          const ratingChecks = await Promise.all(
-            usersList.map((u) => getDoc(doc(db, "queenRatings", `${u.uid}_ep${notationTargetEpisode}`)))
-          );
-          usersList.forEach((u, i) => {
-            const ratingSnap = ratingChecks[i];
-            u.hasRated = isRatingComplete(
-              ratingSnap.exists() ? (ratingSnap.data() as QueenRatingData) : null,
-              notationActiveQueens
+        // vient de sortir ?"). `null` tant qu'aucun épisode n'a encore été publié. Isolé dans son
+        // propre try/catch : une erreur ici (ex. règle Firestore queenRatings pas encore déployée)
+        // ne doit jamais empêcher le reste du panel admin de se charger.
+        try {
+          const notationTargetEpisode = resultsHistoryList[0]?.numero ?? null;
+          if (notationTargetEpisode !== null) {
+            const notationActiveQueens = activeQueensAtEpisode(
+              normalizeQueens(listsSnap.exists() ? listsSnap.data().queens || [] : []),
+              resultsHistoryList,
+              notationTargetEpisode
             );
-          });
+            const ratingChecks = await Promise.all(
+              usersList.map((u) => getDoc(doc(db, "queenRatings", `${u.uid}_ep${notationTargetEpisode}`)))
+            );
+            usersList.forEach((u, i) => {
+              const ratingSnap = ratingChecks[i];
+              u.hasRated = isRatingComplete(
+                ratingSnap.exists() ? (ratingSnap.data() as QueenRatingData) : null,
+                notationActiveQueens
+              );
+            });
+          }
+        } catch (error) {
+          console.error("Erreur lors du calcul de la notation effectuée :", error);
         }
 
         setUsers(usersList);
       } else {
         router.push("/dashboard");
       }
-      setLoading(false);
+      } catch (error) {
+        console.error("Erreur lors du chargement du panel admin :", error);
+      } finally {
+        setLoading(false);
+      }
     };
 
     checkAdmin();

@@ -36,7 +36,7 @@ export default function NextEpisodeModal({
   };
 
   return (
-    <Modal maxWidth="sm">
+    <Modal onClose={onClose} maxWidth="sm">
       <h2 className="font-display text-xl font-bold text-ink mb-2">Préparer le prochain épisode</h2>
       <p className="text-sm text-ink-muted mb-4">
         Les résultats viennent d&apos;être enregistrés. Tu peux enchaîner sur le prochain épisode

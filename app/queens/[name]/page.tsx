@@ -43,29 +43,40 @@ export default function QueenDetailPage() {
       const user = auth.currentUser;
       if (!user) return;
 
-      const [userDoc, queensSnap, resultsSnap, ratingsSnap] = await Promise.all([
-        getDoc(doc(db, "users", user.uid)),
-        getDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9")),
-        getDocs(collection(db, "results")),
-        getDocs(collection(db, "queenRatings")),
-      ]);
+      try {
+        const [userDoc, queensSnap, resultsSnap] = await Promise.all([
+          getDoc(doc(db, "users", user.uid)),
+          getDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9")),
+          getDocs(collection(db, "results")),
+        ]);
 
-      const myData = userDoc.data();
-      setUserData(myData ? (myData as UserData) : null);
+        const myData = userDoc.data();
+        setUserData(myData ? (myData as UserData) : null);
 
-      if (queensSnap.exists()) {
-        setQueens(normalizeQueens(queensSnap.data().queens || []));
+        if (queensSnap.exists()) {
+          setQueens(normalizeQueens(queensSnap.data().queens || []));
+        }
+
+        setResultsHistory(
+          resultsSnap.docs.map((d) => d.data() as ResultData).sort((a, b) => b.numero - a.numero)
+        );
+
+        // Isolé dans son propre try/catch : une erreur ici (ex. règle Firestore queenRatings pas
+        // encore déployée) ne doit jamais empêcher la fiche Queen de s'afficher — au pire, les
+        // notes ne s'affichent pas.
+        try {
+          const ratingsSnap = await getDocs(collection(db, "queenRatings"));
+          const allRatingsData = ratingsSnap.docs.map((d) => d.data() as QueenRatingData);
+          setAllRatings(allRatingsData);
+          setMyRatings(allRatingsData.filter((r) => r.userId === user.uid));
+        } catch (error) {
+          console.error("Erreur lors du chargement des notations :", error);
+        }
+      } catch (error) {
+        console.error("Erreur :", error);
+      } finally {
+        setLoading(false);
       }
-
-      setResultsHistory(
-        resultsSnap.docs.map((d) => d.data() as ResultData).sort((a, b) => b.numero - a.numero)
-      );
-
-      const allRatingsData = ratingsSnap.docs.map((d) => d.data() as QueenRatingData);
-      setAllRatings(allRatingsData);
-      setMyRatings(allRatingsData.filter((r) => r.userId === user.uid));
-
-      setLoading(false);
     };
 
     fetchData();

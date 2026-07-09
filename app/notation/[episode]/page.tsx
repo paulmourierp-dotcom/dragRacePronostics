@@ -37,39 +37,52 @@ export default function NotationPage() {
       const user = auth.currentUser;
       if (!user) return;
 
-      const [userDoc, resultSnap, queensSnap, resultsSnap, existingRatingSnap] = await Promise.all([
-        getDoc(doc(db, "users", user.uid)),
-        getDoc(doc(db, "results", String(episodeNum))),
-        getDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9")),
-        getDocs(collection(db, "results")),
-        getDoc(doc(db, "queenRatings", `${user.uid}_ep${episodeNum}`)),
-      ]);
+      try {
+        const [userDoc, resultSnap, queensSnap, resultsSnap] = await Promise.all([
+          getDoc(doc(db, "users", user.uid)),
+          getDoc(doc(db, "results", String(episodeNum))),
+          getDoc(doc(db, "game-data", "w5fjPTmVyX0HZb3oqFW9")),
+          getDocs(collection(db, "results")),
+        ]);
 
-      const myData = userDoc.data();
-      setUserData(myData ? (myData as UserData) : null);
+        const myData = userDoc.data();
+        setUserData(myData ? (myData as UserData) : null);
 
-      if (resultSnap.exists()) {
-        const result = resultSnap.data() as ResultData;
-        setEpisodeResult(result);
+        if (resultSnap.exists()) {
+          const result = resultSnap.data() as ResultData;
+          setEpisodeResult(result);
 
-        const allQueens: QueenData[] = queensSnap.exists()
-          ? normalizeQueens(queensSnap.data().queens || [])
-          : [];
-        const resultsHistory = resultsSnap.docs.map((d) => d.data() as ResultData);
-        const roster = activeQueensAtEpisode(allQueens, resultsHistory, episodeNum);
-        setActiveQueens(roster);
+          const allQueens: QueenData[] = queensSnap.exists()
+            ? normalizeQueens(queensSnap.data().queens || [])
+            : [];
+          const resultsHistory = resultsSnap.docs.map((d) => d.data() as ResultData);
+          const roster = activeQueensAtEpisode(allQueens, resultsHistory, episodeNum);
+          setActiveQueens(roster);
 
-        const existing = existingRatingSnap.exists()
-          ? (existingRatingSnap.data() as QueenRatingData).ratings
-          : {};
-        const initial: Record<string, number> = {};
-        roster.forEach((q) => {
-          initial[q] = existing[q] ?? DEFAULT_VALUE;
-        });
-        setRatings(initial);
+          // Isolé dans son propre try/catch : une erreur ici (ex. règle Firestore queenRatings pas
+          // encore déployée) ne doit pas empêcher le formulaire de s'afficher — au pire, il se
+          // pré-remplit avec la valeur neutre par défaut plutôt que la notation déjà enregistrée.
+          let existing: Record<string, number> = {};
+          try {
+            const existingRatingSnap = await getDoc(doc(db, "queenRatings", `${user.uid}_ep${episodeNum}`));
+            existing = existingRatingSnap.exists()
+              ? (existingRatingSnap.data() as QueenRatingData).ratings
+              : {};
+          } catch (error) {
+            console.error("Erreur lors du chargement de la notation existante :", error);
+          }
+
+          const initial: Record<string, number> = {};
+          roster.forEach((q) => {
+            initial[q] = existing[q] ?? DEFAULT_VALUE;
+          });
+          setRatings(initial);
+        }
+      } catch (error) {
+        console.error("Erreur :", error);
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     };
 
     fetchData();
