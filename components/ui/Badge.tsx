@@ -14,7 +14,7 @@ const TONE_CLASSES: Record<StatusTone, string> = {
 export const STATUS_LABELS: Record<StatusTone, string> = {
   winner: "Gagnante",
   top: "Top",
-  safe: "Sauve",
+  safe: "Safe",
   bottom: "Bottom",
   eliminee: "Éliminée",
 };
