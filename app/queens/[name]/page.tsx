@@ -5,6 +5,7 @@ import Image from "next/image";
 import AuthGuard from "@/components/AuthGuard";
 import Header from "@/components/Header";
 import LoadingScreen from "@/components/LoadingScreen";
+import Button from "@/components/Button";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import RatingBar from "@/components/ui/RatingBar";
@@ -17,6 +18,7 @@ import { ResultData } from "@/types/result";
 import { QueenRatingData } from "@/types/rating";
 import { normalizeQueens, queenImageUrl } from "@/lib/queens";
 import { statusForQueenInResult, QueenEpisodeStatus } from "@/lib/queenStatus";
+import { activeQueensAtEpisode } from "@/lib/episodeRoster";
 import { communityAverage } from "@/lib/rating";
 
 const STATUS_TONE: Record<QueenEpisodeStatus, "winner" | "top" | "bottom" | "safe"> = {
@@ -118,6 +120,20 @@ export default function QueenDetailPage() {
   const latestAppearance = appearances[0] ?? null;
   const currentStatus = latestAppearance ? statusForQueenInResult(queen.name, latestAppearance) : null;
 
+  // Épisode notable en ce moment = le plus récemment publié, tous épisodes confondus (pas
+  // seulement ceux de cette Queen). On ne propose Noter/Modifier que si la Queen y était encore
+  // en lice et n'y a pas été éliminée (l'accès à la notation des épisodes plus anciens reste
+  // disponible via le bouton "Noter cette prestation" de chaque ligne du parcours ci-dessous).
+  const latestNotableEpisode = resultsHistory[0] ?? null;
+  const canRateLatestEpisode =
+    latestNotableEpisode != null &&
+    latestNotableEpisode.eliminee !== queen.name &&
+    activeQueensAtEpisode(queens, resultsHistory, latestNotableEpisode.numero).includes(queen.name);
+  const myLatestRatingDoc = latestNotableEpisode
+    ? myRatings.find((r) => r.episodeId === latestNotableEpisode.numero)
+    : undefined;
+  const myLatestValue = myLatestRatingDoc?.ratings[queen.name] ?? null;
+
   return (
     <AuthGuard>
       <main className="min-h-screen bg-page">
@@ -143,13 +159,18 @@ export default function QueenDetailPage() {
             </div>
             <div className="flex-1 min-w-[240px]">
               <h1 className="font-display text-3xl font-extrabold text-ink mb-2">{queen.name}</h1>
-              {eliminatedResult ? (
-                <Badge tone="eliminee" className="mb-5">
-                  {`Éliminée à l'épisode ${eliminatedResult.numero}`}
-                </Badge>
-              ) : currentStatus ? (
-                <Badge tone={STATUS_TONE[currentStatus]} className="mb-5" />
-              ) : null}
+              <div className="flex flex-wrap items-center gap-3 mb-5">
+                {eliminatedResult ? (
+                  <Badge tone="eliminee">{`Éliminée à l'épisode ${eliminatedResult.numero}`}</Badge>
+                ) : currentStatus ? (
+                  <Badge tone={STATUS_TONE[currentStatus]} />
+                ) : null}
+                {canRateLatestEpisode && (
+                  <Button size="sm" onClick={() => router.push(`/notation/${latestNotableEpisode!.numero}`)}>
+                    {myLatestValue == null ? "Noter" : "Modifier les notes"}
+                  </Button>
+                )}
+              </div>
 
               <div className="flex flex-wrap gap-3">
                 <Card className="p-4 min-w-[110px]">

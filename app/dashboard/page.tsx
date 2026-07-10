@@ -64,7 +64,8 @@ export default function DashboardPage() {
   const [showCrownModal, setShowCrownModal] = useState(false);
   const [pendingItems, setPendingItems] = useState<PendingActionItem[]>([]);
   const [showPendingModal, setShowPendingModal] = useState(false);
-  const [pendingRatingEpisode, setPendingRatingEpisode] = useState<number | null>(null);
+  const [latestRatableEpisode, setLatestRatableEpisode] = useState<number | null>(null);
+  const [latestRatableEpisodeRated, setLatestRatableEpisodeRated] = useState(false);
   const showToast = useToast();
 
     useEffect(() => {
@@ -132,11 +133,16 @@ export default function DashboardPage() {
               setCrownLocked(isCrownLocked);
             }
 
-            // 5bis. Notation en attente : le plus ancien épisode publié pas encore entièrement noté.
+            // 5bis. Notation en attente : le plus ancien épisode publié pas encore entièrement noté
+            // (alimente le rappel), et notation de l'épisode notable en ce moment (le plus récent
+            // publié : la carte "Ton avis compte" y reste attachée, en "Modifier les notes" une fois
+            // faite, jusqu'à ce qu'un épisode plus récent soit publié).
             // Isolé dans son propre try/catch : une erreur ici (ex. règle Firestore queenRatings pas
             // encore déployée) ne doit jamais empêcher le reste du dashboard (checklist bonus/épisode/
             // couronne, classement...) de s'afficher.
             let pendingEpisode: number | null = null;
+            let latestEpisode: number | null = null;
+            let latestEpisodeRated = false;
             try {
               const resultsSnap = await getDocs(collection(db, "results"));
               const resultsHistory = resultsSnap.docs
@@ -155,10 +161,20 @@ export default function DashboardPage() {
                   break;
                 }
               }
+
+              if (resultsHistory.length > 0) {
+                const latest = resultsHistory[resultsHistory.length - 1];
+                const latestRoster = activeQueensAtEpisode(allQueens, resultsHistory, latest.numero);
+                const latestRatingSnap = ratingSnaps[resultsHistory.length - 1];
+                const latestRating = latestRatingSnap.exists() ? (latestRatingSnap.data() as QueenRatingData) : null;
+                latestEpisode = latest.numero;
+                latestEpisodeRated = isRatingComplete(latestRating, latestRoster);
+              }
             } catch (error) {
               console.error("Erreur lors du calcul de la notation en attente :", error);
             }
-            setPendingRatingEpisode(pendingEpisode);
+            setLatestRatableEpisode(latestEpisode);
+            setLatestRatableEpisodeRated(latestEpisodeRated);
 
             // 6. Rappels : question bonus réinitialisée, nouvel épisode à pronostiquer, couronne manquante, notation en attente.
             const items: PendingActionItem[] = [];
@@ -355,17 +371,17 @@ export default function DashboardPage() {
                 </Button>
             </Card>
 
-            {pendingRatingEpisode != null && (
+            {latestRatableEpisode != null && (
               <Card>
                 <div className="text-xs font-bold uppercase tracking-wide text-ink-muted mb-2.5">Ton avis compte</div>
                 <div className="font-display text-lg font-extrabold text-ink mb-1.5">
-                  Note les Queens de l&apos;épisode {pendingRatingEpisode}
+                  Note les Queens de l&apos;épisode {latestRatableEpisode}
                 </div>
                 <p className="text-sm text-ink-soft mb-4">
                   Donne une note sur 10 à chaque queen pour cet épisode, à chaud.
                 </p>
-                <Button size="lg" onClick={() => router.push(`/notation/${pendingRatingEpisode}`)}>
-                  Noter les Queens
+                <Button size="lg" onClick={() => router.push(`/notation/${latestRatableEpisode}`)}>
+                  {latestRatableEpisodeRated ? "Modifier les notes" : "Noter les Queens"}
                 </Button>
               </Card>
             )}
